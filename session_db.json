@@ -5,11 +5,29 @@
       "data": {
         "password": "1111",
         "phone": "+998946966636",
-        "state": "super_admin_menu",
-        "newOwnerName": "Asila",
-        "newOwnerPhone": "+998946965521",
         "newOwnerUsername": "➕ Add Shop Owner",
-        "newOwnerPassword": "1111"
+        "state": "adding_owner_name"
+      }
+    },
+    {
+      "id": "5131008495:5131008495",
+      "data": {
+        "state": "super_admin_menu",
+        "password": "1111",
+        "phone": "+998946966636"
+      }
+    },
+    {
+      "id": "6671825127:6671825127",
+      "data": {
+        "state": "search_owner",
+        "password": "1111",
+        "phone": "+998946966636",
+        "newOwnerName": "Shorahmat",
+        "newOwnerPhone": "+998940333436",
+        "newOwnerPassword": "2103",
+        "newOwnerShop": "Qodir",
+        "newOwnerShopAddress": "Samarqand"
       }
     }
   ]

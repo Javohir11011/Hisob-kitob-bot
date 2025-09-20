@@ -17,6 +17,7 @@ datasource db {
 enum Role {
   SUPER_ADMIN
   SHOP_OWNER
+  SHOP_HELPER
   USER
 }
 
@@ -27,7 +28,7 @@ enum DebtStatus {
 
 model User {
   id        String   @id @default(uuid())
-  username  String?  @unique
+  name      String?
   password  String
   role      Role     @default(USER)
   phone     String?  @unique
