@@ -55,10 +55,6 @@ export class SuperAdminHandler {
         );
         break;
 
-      // case '❌ Remove Owner':
-      //   await ctx.reply('❌ Remove Owner hali tayyor emas.');
-      //   break;
-
       case '⚙️ Sozlamalar':
         await ctx.reply('⚙️ Sozlamalar hali tayyor emas.');
         break;
@@ -265,8 +261,6 @@ export class SuperAdminHandler {
     await this.showMenu(ctx, session);
   }
 
-  // handleSearchOwner
-
   // Search Owner (Delete + Update tugmalar bilan)
   async handleSearchOwner(ctx: Context, session: SessionData) {
     if (session.state !== 'search_owner') return;
@@ -335,7 +329,7 @@ export class SuperAdminHandler {
       ]),
     );
   }
-
+  
   async saveOwnerField(ctx: Context, session: SessionData) {
     if (!ctx.message || !('text' in ctx.message)) return;
     if (!session.tempOwnerId || !session.updateField) return;
@@ -358,10 +352,15 @@ export class SuperAdminHandler {
       });
     }
 
+    // ✅ Ma’lumot yangilandi
+    await ctx.reply('✅ Owner ma’lumotlari yangilandi');
+
+    // Sessionni tozalaymiz
     session.state = 'super_admin_menu';
     session.tempOwnerId = undefined;
     session.updateField = undefined;
 
-    await ctx.reply('✅ Owner ma’lumotlari yangilandi');
+    // Birdaniga super admin menyusini ko‘rsatamiz
+    await this.showMenu(ctx, session);
   }
 }
