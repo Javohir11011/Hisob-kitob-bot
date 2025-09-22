@@ -6,15 +6,25 @@
         "password": "1111",
         "phone": "+998946966636",
         "newOwnerUsername": "➕ Add Shop Owner",
-        "state": "super_admin_menu"
+        "state": "super_admin_menu",
+        "newOwnerName": "odil",
+        "newOwnerPhone": "+998772025564",
+        "newOwnerPassword": "YYY",
+        "newOwnerShop": "2",
+        "newOwnerShopAddress": "kdakfmas"
       }
     },
     {
       "id": "5131008495:5131008495",
       "data": {
-        "state": "super_admin_menu",
-        "password": "1111",
-        "phone": "+998946966636"
+        "state": "shop_owner_menu",
+        "password": "2",
+        "phone": "+998774049035",
+        "newDebtorName": "F",
+        "newDebtorPhone": "+998774049035",
+        "newDebtorAddress": "Tosh",
+        "tempDebtorId": "125255a9-88d9-43ad-8e9a-68df5e9d6bca",
+        "tempDebtAmount": 8000
       }
     },
     {
@@ -33,14 +43,16 @@
     {
       "id": "1900713644:1900713644",
       "data": {
-        "state": "shop_owner_menu",
+        "state": "shop_owner_profile",
         "password": "2",
         "phone": "+998915319081",
         "newOwnerName": "Abdulaziz",
         "newOwnerPhone": "+998908717304",
         "newOwnerPassword": "2222",
         "newOwnerShop": "Durex",
-        "newOwnerShopAddress": "Tashkent"
+        "newOwnerShopAddress": "Tashkent",
+        "tempDebtAmount": 20000,
+        "tempDebtorId": "50cfc80e-ac95-4434-bba6-a1068456ba46"
       }
     },
     {

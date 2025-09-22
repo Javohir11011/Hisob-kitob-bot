@@ -27,16 +27,17 @@ enum DebtStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String?
-  password  String
-  role      Role     @default(DEBTOR)
-  phone     String?  @unique
-  shopId    String?
-  shop      Shop?    @relation(fields: [shopId], references: [id])
-  debts     Debt[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  name       String?
+  password   String
+  telegramId String?  @unique
+  role       Role     @default(DEBTOR)
+  phone      String?  @unique
+  shopId     String?
+  shop       Shop?    @relation(fields: [shopId], references: [id])
+  debts      Debt[]
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 }
 
 model Shop {
@@ -56,7 +57,7 @@ model Debt {
   status    DebtStatus @default(UNPAID)
   createdAt DateTime   @default(now())
 
-  debtorId String
+  debtorId String // 🔴 majburiy
   debtor   Debtor @relation(fields: [debtorId], references: [id])
 
   payments Payment[]
@@ -65,11 +66,12 @@ model Debt {
 }
 
 model Debtor {
-  id        String   @id @default(uuid())
-  name      String
-  phone     String   @unique
-  address   String?
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  name       String
+  phone      String   @unique
+  telegramId String?  @unique
+  address    String?
+  createdAt  DateTime @default(now())
 
   debts  Debt[]
   shopId String

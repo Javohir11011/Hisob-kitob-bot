@@ -8,7 +8,7 @@ import { SessionData } from '../states/session.data';
 export class SuperAdminHandler {
   constructor(private prisma: PrismaService) {}
 
-  // 🔹 Asosiy menyuni ko'rsatish
+  // 🔹 Asosiy menyu
   async showMenu(ctx: Context, session: SessionData) {
     session.state = 'super_admin_menu';
     await ctx.reply(
@@ -33,8 +33,6 @@ export class SuperAdminHandler {
       typeof ctx.message.text === 'string'
         ? ctx.message.text.trim()
         : undefined;
-
-    console.log('Menu tugmasi:', text);
 
     switch (text) {
       case '📊 Statistika':
@@ -76,7 +74,7 @@ export class SuperAdminHandler {
     }
   }
 
-  // 🔹 Add Owner jarayoni
+  // 🔹 Shop Owner qo‘shish jarayoni
   async handleAddOwner(ctx: Context, session: SessionData) {
     const text =
       ctx.message &&
@@ -109,14 +107,16 @@ export class SuperAdminHandler {
 
         if (!/^\+998\d{9}$/.test(phone)) {
           await ctx.reply(
-            'Telefon raqam noto‘g‘ri formatda. +998XXXXXXXXX formatida kiriting:',
+            '❌ Telefon raqam noto‘g‘ri formatda. +998XXXXXXXXX kiriting.',
           );
           return;
         }
 
         const exists = await this.prisma.user.findFirst({ where: { phone } });
         if (exists) {
-          await ctx.reply('Bu raqam allaqachon mavjud. Boshqa raqam kiriting:');
+          await ctx.reply(
+            '❌ Bu raqam allaqachon mavjud. Boshqa raqam kiriting.',
+          );
           return;
         }
 
@@ -165,11 +165,12 @@ export class SuperAdminHandler {
             password: await bcrypt.hash(session.newOwnerPassword ?? '', 10),
             role: 'SHOP_OWNER',
             shopId: shop.id,
+            telegramId: null, // ❌ hozircha super adminning id’sini yozmaysiz
           },
         });
 
         await ctx.reply(
-          `Yangi shop owner "${session.newOwnerName}" va dokoni "${shop.name}" qo‘shildi ✅`,
+          `✅ Yangi shop owner "${session.newOwnerName}" va dokoni "${shop.name}" qo‘shildi.`,
         );
 
         await this.showMenu(ctx, session);
@@ -179,7 +180,7 @@ export class SuperAdminHandler {
 
   // 🔹 Statistika
   async showStatistics(ctx: Context, page = 1) {
-    const pageSize = 10;
+    const pageSize = 5;
     const skip = (page - 1) * pageSize;
 
     const owners = await this.prisma.user.findMany({
@@ -191,7 +192,7 @@ export class SuperAdminHandler {
     });
 
     if (!owners.length) {
-      await ctx.reply('Hozircha hech qanday shop owner mavjud emas.');
+      await ctx.reply('❌ Hozircha hech qanday shop owner mavjud emas.');
       return;
     }
 
@@ -209,43 +210,41 @@ export class SuperAdminHandler {
     const totalOwners = await this.prisma.user.count({
       where: { role: 'SHOP_OWNER' },
     });
-
-    // Tugmalar
-    const buttons: Array<Array<ReturnType<typeof Markup.button.callback>>> = [];
-    const row: Array<ReturnType<typeof Markup.button.callback>> = [];
-
-    if (page > 1)
-      row.push(Markup.button.callback('⬅️ Orqaga', `stats_page_${page - 1}`));
     const totalPages = Math.ceil(totalOwners / pageSize);
+
+    const buttons: any[] = [];
+    if (page > 1)
+      buttons.push(
+        Markup.button.callback('⬅️ Orqaga', `stats_page_${page - 1}`),
+      );
     if (page < totalPages)
-      row.push(Markup.button.callback('➡️ Keyingi', `stats_page_${page + 1}`));
-    if (row.length) buttons.push(row);
+      buttons.push(
+        Markup.button.callback('➡️ Keyingi', `stats_page_${page + 1}`),
+      );
 
     await ctx.reply(
       message,
-      buttons.length ? Markup.inlineKeyboard(buttons) : undefined,
+      buttons.length ? Markup.inlineKeyboard([buttons]) : undefined,
     );
   }
 
+  // 🔹 Profil
   async showProfile(ctx: Context, session: SessionData) {
     if (!session.phone) {
       await ctx.reply(
-        'Profil ma’lumotlarini ko‘rish uchun avval login qilishingiz kerak.',
+        '❌ Profil ma’lumotlarini ko‘rish uchun avval login qiling.',
       );
       return;
     }
 
-    // Super adminni telefon raqamiga qarab topamiz
     const user = await this.prisma.user.findFirst({
       where: { phone: session.phone },
     });
-
     if (!user) {
-      await ctx.reply('Foydalanuvchi topilmadi.');
+      await ctx.reply('❌ Foydalanuvchi topilmadi.');
       return;
     }
 
-    // Profil xabarini tayyorlash
     const message = `
 👤 Ism: ${user.name}
 📞 Telefon: ${user.phone}
@@ -256,12 +255,7 @@ export class SuperAdminHandler {
     await ctx.reply(message);
   }
 
-  // /menu komandasi
-  async handleMenuCommand(ctx: Context, session: SessionData) {
-    await this.showMenu(ctx, session);
-  }
-
-  // Search Owner (Delete + Update tugmalar bilan)
+  // 🔹 Search Owner
   async handleSearchOwner(ctx: Context, session: SessionData) {
     if (session.state !== 'search_owner') return;
 
@@ -291,7 +285,7 @@ export class SuperAdminHandler {
     });
 
     if (!owners.length) {
-      await ctx.reply('Hech qanday mos keladigan Shop Owner topilmadi.');
+      await ctx.reply('❌ Hech qanday mos keladigan Shop Owner topilmadi.');
       return;
     }
 
@@ -315,7 +309,7 @@ export class SuperAdminHandler {
     );
   }
 
-  // Update jarayoni boshlanishi
+  // 🔹 Update jarayoni
   async handleUpdateOwner(ctx: Context, session: SessionData, ownerId: string) {
     session.tempOwnerId = ownerId;
     session.state = 'updating_owner';
@@ -329,7 +323,7 @@ export class SuperAdminHandler {
       ]),
     );
   }
-  
+
   async saveOwnerField(ctx: Context, session: SessionData) {
     if (!ctx.message || !('text' in ctx.message)) return;
     if (!session.tempOwnerId || !session.updateField) return;
@@ -352,15 +346,12 @@ export class SuperAdminHandler {
       });
     }
 
-    // ✅ Ma’lumot yangilandi
     await ctx.reply('✅ Owner ma’lumotlari yangilandi');
 
-    // Sessionni tozalaymiz
     session.state = 'super_admin_menu';
     session.tempOwnerId = undefined;
     session.updateField = undefined;
 
-    // Birdaniga super admin menyusini ko‘rsatamiz
     await this.showMenu(ctx, session);
   }
 }
