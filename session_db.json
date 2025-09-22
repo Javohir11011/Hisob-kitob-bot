@@ -6,7 +6,7 @@
         "password": "1111",
         "phone": "+998946966636",
         "newOwnerUsername": "➕ Add Shop Owner",
-        "state": "adding_owner_name"
+        "state": "super_admin_menu"
       }
     },
     {
@@ -20,14 +20,35 @@
     {
       "id": "6671825127:6671825127",
       "data": {
-        "state": "search_owner",
-        "password": "1111",
-        "phone": "+998946966636",
-        "newOwnerName": "Shorahmat",
+        "state": "shop_owner_menu",
+        "password": "11111111",
+        "phone": "+998940333436",
+        "newOwnerName": "Navroʻz",
         "newOwnerPhone": "+998940333436",
-        "newOwnerPassword": "2103",
-        "newOwnerShop": "Qodir",
-        "newOwnerShopAddress": "Samarqand"
+        "newOwnerPassword": "11111111",
+        "newOwnerShop": "Nnnnn",
+        "newOwnerShopAddress": "Naaaaaaaa"
+      }
+    },
+    {
+      "id": "1900713644:1900713644",
+      "data": {
+        "state": "shop_owner_menu",
+        "password": "2",
+        "phone": "+998915319081",
+        "newOwnerName": "Abdulaziz",
+        "newOwnerPhone": "+998908717304",
+        "newOwnerPassword": "2222",
+        "newOwnerShop": "Durex",
+        "newOwnerShopAddress": "Tashkent"
+      }
+    },
+    {
+      "id": "6347903736:6347903736",
+      "data": {
+        "state": "super_admin_menu",
+        "password": "1111",
+        "phone": "+998946966636"
       }
     }
   ]

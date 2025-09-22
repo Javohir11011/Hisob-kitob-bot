@@ -18,7 +18,7 @@ enum Role {
   SUPER_ADMIN
   SHOP_OWNER
   SHOP_HELPER
-  USER
+  DEBTOR
 }
 
 enum DebtStatus {
@@ -30,7 +30,7 @@ model User {
   id        String   @id @default(uuid())
   name      String?
   password  String
-  role      Role     @default(USER)
+  role      Role     @default(DEBTOR)
   phone     String?  @unique
   shopId    String?
   shop      Shop?    @relation(fields: [shopId], references: [id])
@@ -46,6 +46,7 @@ model Shop {
   users     User[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  Debtor    Debtor[]
 }
 
 model Debt {
@@ -54,9 +55,25 @@ model Debt {
   note      String?
   status    DebtStatus @default(UNPAID)
   createdAt DateTime   @default(now())
-  userId    String
-  user      User       @relation(fields: [userId], references: [id])
-  payments  Payment[]
+
+  debtorId String
+  debtor   Debtor @relation(fields: [debtorId], references: [id])
+
+  payments Payment[]
+  User     User?     @relation(fields: [userId], references: [id])
+  userId   String?
+}
+
+model Debtor {
+  id        String   @id @default(uuid())
+  name      String
+  phone     String   @unique
+  address   String?
+  createdAt DateTime @default(now())
+
+  debts  Debt[]
+  shopId String
+  shop   Shop   @relation(fields: [shopId], references: [id])
 }
 
 model Payment {
