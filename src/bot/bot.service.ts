@@ -1,6 +1,10 @@
 // src/bot/bot.service.ts
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { exec } from 'child_process';
+import fs from 'fs';
+import fetch from 'node-fetch';
+import path from 'path';
 import { PrismaService } from 'src/core/prisma.service';
 import { Context, Telegraf } from 'telegraf';
 import LocalSession from 'telegraf-session-local';
@@ -25,7 +29,6 @@ export class BotService implements OnModuleInit {
 
     this.bot = new Telegraf(token);
 
-    // 🔹 Local session
     const localSession = new LocalSession<SessionData>({
       database: 'session_db.json',
       property: 'session',
@@ -39,12 +42,12 @@ export class BotService implements OnModuleInit {
     this.bot.launch();
     console.log('✅ Bot ishga tushdi');
 
-    // Graceful shutdown
     process.once('SIGINT', () => this.bot.stop('SIGINT'));
     process.once('SIGTERM', () => this.bot.stop('SIGTERM'));
   }
 
   private setupCommands() {
+    
     // --- START ---
     this.bot.start(async (ctx) => {
       try {
@@ -66,90 +69,117 @@ export class BotService implements OnModuleInit {
     // --- TEXT HANDLER ---
     this.bot.on('text', async (ctx) => {
       const session = ctx.session as SessionData;
-      const text = 'text' in ctx.message ? ctx.message.text.trim() : undefined;
-      if (!text) return;
+      if (!ctx.message || !('text' in ctx.message)) return;
+
+      const text = ctx.message.text.trim();
 
       try {
-        switch (session.state) {
-          // 🔹 Login steps
-          case 'awaiting_password':
+        // Login state
+        if (
+          ['awaiting_password', 'awaiting_phone'].includes(session.state ?? '')
+        ) {
+          if (session.state === 'awaiting_password') {
             return this.authHandler.handlePassword({ ctx, session });
-          case 'awaiting_phone':
+          } else {
             return this.authHandler.handleContact(ctx, session);
+          }
+        }
 
-          // 🔹 Add owner / Update owner states
-          case 'adding_owner_name':
-          case 'adding_owner_phone':
-          case 'adding_owner_password':
-          case 'adding_owner_shop':
-          case 'adding_owner_shop_address':
-          case 'updating_owner_field':
-            if (text === '❌ Bekor qilish') {
-              session.state = 'super_admin_menu';
-              await this.superAdminHandler.showMenu(ctx, session);
-              return;
+        // Super admin states
+        const superAdminStates = [
+          'adding_owner_name',
+          'adding_owner_phone',
+          'adding_owner_password',
+          'adding_owner_shop',
+          'adding_owner_shop_address',
+          'updating_owner_field',
+          'search_owner',
+          'super_admin_menu',
+        ];
+
+        if (superAdminStates.includes(session.state ?? '')) {
+          switch (session.state) {
+            case 'adding_owner_name':
+            case 'adding_owner_phone':
+            case 'adding_owner_password':
+            case 'adding_owner_shop':
+            case 'adding_owner_shop_address':
+              if (text === '❌ Bekor qilish') {
+                session.state = 'super_admin_menu';
+                return this.superAdminHandler.showMenu(ctx, session);
+              }
+              return this.superAdminHandler.handleAddOwner(ctx, session);
+
+            case 'search_owner':
+              if (text === '❌ Bekor qilish') {
+                session.state = 'super_admin_menu';
+                return this.superAdminHandler.showMenu(ctx, session);
+              }
+              return this.superAdminHandler.handleSearchOwner(ctx, session);
+
+            case 'super_admin_menu':
+              return this.superAdminHandler.handleMenu(ctx, session);
+
+            case 'updating_owner_field':
+              return this.superAdminHandler.saveOwnerField(ctx, session);
+          }
+        }
+
+        // Shop Owner / Helper states
+        if (['SHOP_OWNER', 'SHOP_HELPER'].includes(session.role ?? '')) {
+          const shopStates = [
+            'shop_owner_menu',
+            'shop_owner_profile',
+            'adding_helper_name',
+            'adding_helper_phone',
+            'adding_helper_password',
+            'adding_debtor_name',
+            'adding_debtor_phone',
+            'adding_debtor_address',
+            'adding_debt_amount',
+            'adding_debt_note',
+            'search_debtor_for_debt',
+          ];
+
+          if (shopStates.includes(session.state ?? '')) {
+            switch (session.state) {
+              case 'shop_owner_menu':
+              case 'shop_owner_profile':
+              case 'adding_helper_name':
+              case 'adding_helper_phone':
+              case 'adding_helper_password':
+              case 'adding_debtor_name':
+              case 'adding_debtor_phone':
+              case 'adding_debtor_address':
+              case 'adding_debt_amount':
+              case 'adding_debt_note':
+                return this.shopOwnerHandler.handleText(ctx, session);
+
+              case 'search_debtor_for_debt':
+                return this.shopOwnerHandler.handleSearchAndSelectDebtor(
+                  ctx,
+                  session,
+                );
             }
-            return this.superAdminHandler.handleAddOwner(ctx, session);
+          }
+        }
 
-          // 🔹 Search owner
-          case 'search_owner':
-            if (text === '❌ Bekor qilish') {
-              session.state = 'super_admin_menu';
-              await this.superAdminHandler.showMenu(ctx, session);
-              return;
-            }
-            return this.superAdminHandler.handleSearchOwner(ctx, session);
+        // Agar session.state aniqlanmagan bo‘lsa → role bo‘yicha menu
+        if (!session.phone) return;
 
-          // 🔹 Super Admin menu
-          case 'super_admin_menu':
-            return this.superAdminHandler.handleMenu(ctx, session);
+        const user = await this.prisma.user.findFirst({
+          where: { phone: session.phone },
+        });
+        if (!user) return;
 
-          // 🔹 Shop Owner states
-          case 'shop_owner_menu':
-          case 'shop_owner_profile':
-          case 'adding_helper_name':
-          case 'adding_helper_phone':
-          case 'adding_helper_password':
-          case 'adding_debt_name':
-          case 'adding_debt_amount':
-          case 'paying_debt_name':
-          case 'paying_debt_amount':
-            return this.shopOwnerHandler.handleText(ctx, session);
+        session.role = user.role as SessionData['role'];
 
-          // 🔹 Debtor qo‘shish states
-          case 'adding_debtor_name':
-          case 'adding_debtor_phone':
-          case 'adding_debtor_address':
-            return this.shopOwnerHandler.handleAddDebtor(ctx, session);
-
-          // 🔹 Qarz qo‘shish states (❌ SENDA YO‘Q EDI)
-          case 'search_debtor_for_debt':
-            return this.shopOwnerHandler.handleSearchDebtorForDebt(
-              ctx,
-              session,
-            );
-          case 'adding_debt_note':
-            return this.shopOwnerHandler.handleAddDebtAmountAndNote(
-              ctx,
-              session,
-            );
-
-          default:
-            // Agar state aniqlanmagan bo‘lsa → roli bo‘yicha menyu
-            if (!session.phone) return;
-            const user = await this.prisma.user.findFirst({
-              where: { phone: session.phone },
-            });
-            if (!user) return;
-
-            if (user.role === 'SUPER_ADMIN') {
-              session.state = 'super_admin_menu';
-              await this.superAdminHandler.showMenu(ctx, session);
-            } else if (user.role === 'SHOP_OWNER') {
-              session.state = 'shop_owner_menu';
-              await this.shopOwnerHandler.showMenu(ctx, session);
-            }
-            break;
+        if (user.role === 'SUPER_ADMIN') {
+          session.state = 'super_admin_menu';
+          await this.superAdminHandler.showMenu(ctx, session);
+        } else if (['SHOP_OWNER', 'SHOP_HELPER'].includes(user.role)) {
+          session.state = 'shop_owner_menu';
+          await this.shopOwnerHandler.showMenu(ctx, session);
         }
       } catch (err) {
         console.error('❌ text handler error:', err);
@@ -165,90 +195,142 @@ export class BotService implements OnModuleInit {
       }
     });
 
-    // --- SUPER ADMIN ACTIONS ---
-    this.bot.action(/stats_page_(\d+)/, async (ctx: any) => {
+    // --- CALLBACK QUERY ---
+    this.bot.on('callback_query', async (ctx: any) => {
       try {
-        const page = parseInt(ctx.match[1], 10);
-        await this.superAdminHandler.showStatistics(ctx, page);
+        const session = ctx.session as SessionData;
+        await this.shopOwnerHandler.handleCallbackQuery(ctx, session);
       } catch (err) {
-        console.error('❌ stats_page error:', err);
+        console.error('❌ callback_query error:', err);
       }
     });
 
-    this.bot.action(/delete_owner_(.+)/, async (ctx: any) => {
+    // --- INLINE ACTIONS (addDebt) ---
+    this.bot.action(/addDebt:(.+)/, async (ctx: any) => {
       try {
-        const ownerId = ctx.match[1];
-        if (!ownerId) return ctx.answerCbQuery('Owner topilmadi ❌');
+        const session = ctx.session as SessionData;
+        const debtorId = ctx.match[1];
+        session.tempDebtorId = debtorId;
+        session.state = 'adding_debt_amount';
 
-        const owner = await this.prisma.user.findUnique({
-          where: { id: ownerId },
+        const debtor = await this.prisma.debtor.findUnique({
+          where: { id: debtorId },
         });
-        if (!owner) return ctx.answerCbQuery('Owner topilmadi ❌');
-
-        await this.prisma.user.delete({ where: { id: ownerId } });
-        await ctx.editMessageText(`✅ ${owner.name} o‘chirildi`);
-        await ctx.answerCbQuery('Owner muvaffaqiyatli o‘chirildi ✅');
+        await ctx.answerCbQuery(`Qarz summasini kiriting ${debtor?.name}`);
+        await ctx.reply(
+          `👤 Qarzdor tanlandi:\n\nIsm: ${debtor?.name}\n📞 ${debtor?.phone ?? 'yo‘q'}\n🏠 ${debtor?.address ?? 'yo‘q'}\n\n💰 Endi qarz summasini kiriting:`,
+          {
+            reply_markup: {
+              keyboard: [['❌ Bekor qilish']],
+              resize_keyboard: true,
+            },
+          },
+        );
       } catch (err) {
-        console.error('❌ delete_owner error:', err);
+        console.error('❌ addDebt action error:', err);
       }
     });
 
-    this.bot.action(/update_owner_(.+)/, async (ctx: any) => {
-      try {
-        const ownerId = ctx.match[1];
-        const session = ctx.session as SessionData;
-        await this.superAdminHandler.handleUpdateOwner(ctx, session, ownerId);
-      } catch (err) {
-        console.error('❌ update_owner error:', err);
-      }
-    });
-
-    this.bot.action(/update_field_(.+)/, async (ctx: any) => {
-      try {
-        const session = ctx.session as SessionData;
-        const fieldMap = { name: 'name', phone: 'phone', shop: 'shop' };
-        const fieldKey = ctx.match[1];
-        session.updateField = fieldMap[fieldKey] as 'name' | 'phone' | 'shop';
-        session.state = 'updating_owner_field';
-        await ctx.reply('Yangi qiymatni kiriting:');
-      } catch (err) {
-        console.error('❌ update_field error:', err);
-      }
-    });
-
-    this.bot.action(/update_cancel/, async (ctx: any) => {
-      try {
-        const session = ctx.session as SessionData;
-        session.state = 'super_admin_menu';
-        session.tempOwnerId = undefined;
-        session.updateField = undefined;
-        await ctx.answerCbQuery('Bekor qilindi ❌');
-        await this.superAdminHandler.showMenu(ctx, session);
-      } catch (err) {
-        console.error('❌ update_cancel error:', err);
-      }
-    });
-    this.bot.action(/select_debtor_(.+)/, async (ctx: any) => {
-      const debtorId = ctx.match[1];
+    // TEXT + VOICE birlashtirish
+    this.bot.on(['text', 'voice', 'audio'], async (ctx) => {
       const session = ctx.session as SessionData;
+      if (session.state !== 'adding_debt_amount') return;
+      if (!ctx.message) return;
 
-      session.tempDebtorId = debtorId;
-      session.state = 'adding_debt_amount';
+      const message = ctx.message as
+        | { text: string }
+        | { voice: { file_id: string } }
+        | { audio: { file_id: string } };
 
-      const debtor = await this.prisma.debtor.findUnique({
-        where: { id: debtorId },
+      if ('text' in message) {
+        await this.handleDebtAmountVoice(ctx, session, message.text);
+      } else if ('voice' in message) {
+        await this.handleDebtAmountVoice(ctx, session, message.voice.file_id);
+      } else if ('audio' in message) {
+        await this.handleDebtAmountVoice(ctx, session, message.audio.file_id);
+      }
+    });
+  }
+
+  // handleDebtAmount funksiyasi (ovozi + text)
+  private async handleDebtAmountVoice(
+    ctx: Context,
+    session: SessionData,
+    fileId: string,
+  ) {
+    try {
+      // 1️⃣ Ovoz faylini olish
+      const fileLink = await ctx.telegram.getFileLink(fileId);
+      const filePath = path.join(__dirname, `temp_${Date.now()}.ogg`);
+      const response = await fetch(fileLink.href);
+      const arrayBuffer = await response.arrayBuffer();
+      fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+
+      // 2️⃣ Ovoz → wav
+      const wavPath = filePath.replace('.ogg', '.wav');
+      await new Promise((resolve, reject) => {
+        exec(`ffmpeg -i ${filePath} -ar 16000 -ac 1 ${wavPath}`, (err) =>
+          err ? reject(err) : resolve(true),
+        );
       });
 
-      await ctx.editMessageText(
-        `👤 Qarzdor tanlandi:\n\nIsm: ${debtor?.name}\n📞 ${debtor?.phone ?? 'yo‘q'}\n🏠 ${debtor?.address ?? 'yo‘q'}\n\n💰 Endi qarz summasini kiriting:`,
-      );
+      // 3️⃣ Whisper transkriptsiya
+      const txtPath = wavPath.replace('.wav', '.txt');
+      await new Promise((resolve, reject) => {
+        exec(`./main -m ggml-small.bin -f ${wavPath} -otxt`, (err) =>
+          err ? reject(err) : resolve(true),
+        );
+      });
 
-      await ctx.reply('💰 Qarz summasini kiriting:', {
-        reply_markup: {
-          keyboard: [['❌ Bekor qilish']],
-          resize_keyboard: true,
+      const text = fs.readFileSync(txtPath, 'utf-8');
+
+      // 4️⃣ Fayllarni tozalash
+      fs.unlinkSync(filePath);
+      fs.unlinkSync(wavPath);
+      fs.unlinkSync(txtPath);
+
+      // 5️⃣ Matndan summani ajratish
+      const amountMatch = text.match(/(\d+(\.\d+)?)/);
+      if (!amountMatch) {
+        await ctx.reply(
+          '❌ Summani aniqlay olmadim. Iltimos, qayta urinib ko‘ring.',
+        );
+        return;
+      }
+
+      const amount = parseFloat(amountMatch[1]);
+
+      // 6️⃣ Summani foydalanuvchiga ko‘rsatish
+      await ctx.reply(`🔢 Siz kiritgan summa: ${amount} so'm`);
+
+      // 7️⃣ Minimum 1000 so‘m tekshiruvi
+      if (amount < 1000) {
+        await ctx.reply(
+          '❌ Qarz summasi kamida 1000 so‘m bo‘lishi kerak. Iltimos, qayta kiriting.',
+        );
+        session.state = 'adding_debt_amount'; // yana urinishi uchun state
+        return;
+      }
+
+      // 8️⃣ DB ga qo‘shish
+      if (!session.tempDebtorId || !session.shopId) return;
+
+      await this.prisma.debt.create({
+        data: {
+          debtorId: session.tempDebtorId,
+          amount,
+          note: text,
+          userId: session.userId,
         },
       });
-    });
+
+      await ctx.reply(`✅ Qarz muvaffaqiyatli qo‘shildi: ${amount} so'm`);
+
+      session.state = 'shop_owner_menu';
+      await this.shopOwnerHandler.showMenu(ctx, session);
+    } catch (err) {
+      console.error('❌ handleDebtAmountVoice error:', err);
+      await ctx.reply('❌ Xatolik yuz berdi, iltimos qayta urinib ko‘ring.');
+    }
   }
 }

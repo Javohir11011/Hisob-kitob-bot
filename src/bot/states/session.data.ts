@@ -1,4 +1,6 @@
+// types/session.ts
 export type SessionData = {
+  // 🔹 Hozirgi session holati
   state?:
     | 'awaiting_password'
     | 'awaiting_phone'
@@ -22,22 +24,38 @@ export type SessionData = {
     | 'adding_debtor_phone'
     | 'adding_debtor_address'
     | 'search_debtor_for_debt'
+    | 'selecting_debtor'
+    | 'adding_debtor_initial_debt'
 
     // 🔹 Debt (qarzlar bilan ishlash)
     | 'adding_debt_name'
     | 'adding_debt_amount'
     | 'adding_debt_note'
     | 'paying_debt_name'
-    | 'paying_debt_amount';
+    | 'paying_debt_amount'
+    | 'updating_debt'
+    | 'editing_debt'
+    | 'awaiting_debtor_selection';
 
   // --- General session data ---
-  tempOwnerId?: string;
-  updateField?: 'name' | 'phone' | 'shop';
-  password?: string;
-  phone?: string;
-  user?: any;
   userId: string;
-  debtorId?: string; // qarzdor tanlanganda
+  phone?: string;
+  password?: string;
+  user?: any;
+  role?: 'SUPER_ADMIN' | 'SHOP_OWNER' | 'SHOP_HELPER'; // user roli
+
+  tempOwnerId?: string; // Owner qo‘shishda vaqtinchalik
+  updateField?: 'name' | 'phone' | 'shop';
+
+  debtorId?: string; // Tanlangan qarzdor id
+  tempDebtorId?: string; // Vaqtinchalik qarzdor id
+  editingDebtId?: string; // Tahrirlash uchun qarz id
+  tempDebtorList?: Array<{
+    id: string;
+    name: string;
+    phone?: string;
+    address?: string | null;
+  }>;
 
   // --- Owner qo‘shish ---
   newOwnerName?: string;
@@ -55,11 +73,12 @@ export type SessionData = {
   newDebtorName?: string;
   newDebtorPhone?: string;
   newDebtorAddress?: string;
-  tempDebtorId?: string;
 
   // --- Debt qo‘shish ---
-  tempDebtName?: string; // Qarzdorning ismi / tanlangan nomi
-  tempDebtAmount?: number; // Summani vaqtincha saqlash
-  tempDebtNote?: string; // Izohni vaqtincha saqlash
-  newDebtTitle?: string; // Agar nom berilsa
+  tempDebtName?: string; // Qarzdor nomi
+  tempDebtAmount?: number;
+  tempDebtNote?: string;
+  newDebtTitle?: string;
+
+  shopId?: string; // Hozirgi shop id
 };
