@@ -22,6 +22,14 @@ export type SessionData = {
     | 'updating_own_name'
     | 'updating_own_phone'
     | 'updating_own_password'
+    | 'searching_debtor'
+    | 'editing_debtor_name'
+    | 'editing_debtor_phone'
+    | 'debtor_menu'
+    | 'editing_debtor'
+    | 'paying_debt'
+    | 'awaiting_debtor_for_payment'
+    | 'awaiting_single_debt_payment'
 
     // 🔹 Debtor (qarzdorlar bilan ishlash)
     | 'adding_debtor_name'
@@ -67,6 +75,7 @@ export type SessionData = {
   newOwnerPassword?: string;
   newOwnerShop?: string;
   newOwnerShopAddress?: string;
+  editingDebtorId?: string;
 
   // --- Helper qo‘shish ---
   newHelperName?: string;

@@ -138,6 +138,8 @@ export class BotService implements OnModuleInit {
             'adding_debt_amount',
             'adding_debt_note',
             'search_debtor_for_debt',
+            'debtor_menu', // ✅ Qarzdorlar menyusi uchun qo‘shildi
+            'searching_debtor', // ✅ Qidiruv bosqichi uchun ham qo‘shildi
           ];
 
           if (shopStates.includes(session.state ?? '')) {
@@ -152,6 +154,8 @@ export class BotService implements OnModuleInit {
               case 'adding_debtor_address':
               case 'adding_debt_amount':
               case 'adding_debt_note':
+              case 'debtor_menu': // ✅ Shu yerga ham kiritamiz
+              case 'searching_debtor': // ✅ Qidiruv holati ham shu yerda ishlaydi
                 return this.shopOwnerHandler.handleText(ctx, session);
 
               case 'search_debtor_for_debt':
