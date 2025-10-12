@@ -3,47 +3,57 @@
     {
       "id": "6624217456:6624217456",
       "data": {
-        "password": "1111",
+        "password": "1",
         "phone": "+998946966636",
         "newOwnerUsername": "➕ Add Shop Owner",
         "state": "super_admin_menu",
-        "newOwnerName": "odil",
-        "newOwnerPhone": "+998772025564",
-        "newOwnerPassword": "YYY",
-        "newOwnerShop": "2",
-        "newOwnerShopAddress": "kdakfmas"
+        "role": "SUPER_ADMIN",
+        "tempDebtorId": "197286f4-63ca-429e-bed9-fcdd3f63b388",
+        "tempDebtAmount": 20000,
+        "newOwnerName": "Abbosbek Toshpo'latov",
+        "newOwnerPhone": "+998999095064",
+        "newOwnerPassword": "22",
+        "newOwnerShop": "Nur Savdo",
+        "newOwnerShopAddress": "Russia"
       }
     },
     {
       "id": "5131008495:5131008495",
       "data": {
         "state": "shop_owner_menu",
-        "password": "2",
+        "password": "22",
         "phone": "+998774049035",
-        "newDebtorName": "F",
-        "newDebtorPhone": "+998774049035",
-        "newDebtorAddress": "Tosh",
-        "tempDebtorId": "125255a9-88d9-43ad-8e9a-68df5e9d6bca",
-        "tempDebtAmount": 8000
+        "newDebtorName": "J",
+        "newDebtorPhone": "+998772644602",
+        "newDebtorAddress": "Tsh",
+        "tempDebtorId": "0fe057d7-ea74-42b6-8705-69a67bf37e4c",
+        "tempDebtAmount": 6000,
+        "role": "SHOP_OWNER"
       }
     },
     {
       "id": "6671825127:6671825127",
       "data": {
-        "state": "shop_owner_menu",
-        "password": "11111111",
+        "state": "shop_owner_profile",
+        "password": "2",
         "phone": "+998940333436",
         "newOwnerName": "Navroʻz",
         "newOwnerPhone": "+998940333436",
         "newOwnerPassword": "11111111",
         "newOwnerShop": "Nnnnn",
-        "newOwnerShopAddress": "Naaaaaaaa"
+        "newOwnerShopAddress": "Naaaaaaaa",
+        "role": "SHOP_OWNER",
+        "newDebtorName": "Nnnnnn",
+        "newDebtorPhone": "+998900000000",
+        "newDebtorAddress": "Qotatosh",
+        "tempDebtorId": "c460be7e-2846-4408-9883-87e95d9cef01",
+        "tempDebtAmount": 10000
       }
     },
     {
       "id": "1900713644:1900713644",
       "data": {
-        "state": "shop_owner_profile",
+        "state": "shop_owner_menu",
         "password": "2",
         "phone": "+998915319081",
         "newOwnerName": "Abdulaziz",
@@ -51,8 +61,35 @@
         "newOwnerPassword": "2222",
         "newOwnerShop": "Durex",
         "newOwnerShopAddress": "Tashkent",
-        "tempDebtAmount": 20000,
-        "tempDebtorId": "50cfc80e-ac95-4434-bba6-a1068456ba46"
+        "tempDebtAmount": 100000,
+        "tempDebtorId": "74bafde2-199d-4bea-97c8-46f4ecf7c9ee",
+        "newDebtorName": "Komil",
+        "newDebtorPhone": "+998934522314",
+        "newDebtorAddress": "Samarqand",
+        "tempDebtorList": [
+          {
+            "id": "bbe9ac92-dfef-4f7a-bc85-4b6bd949a5c9",
+            "name": "javohir",
+            "phone": "+998975645241",
+            "telegramId": null,
+            "address": "samarqand",
+            "createdAt": "2025-09-28T13:43:27.703Z",
+            "shopId": "11bcce88-58e4-4074-96c1-0a41744b8084"
+          },
+          {
+            "id": "6512f134-a515-4bfd-87bb-c5ef67387bdf",
+            "name": "Javohir",
+            "phone": "+998974125474",
+            "telegramId": null,
+            "address": "Samarqand",
+            "createdAt": "2025-09-28T13:56:57.446Z",
+            "shopId": "11bcce88-58e4-4074-96c1-0a41744b8084"
+          }
+        ],
+        "newHelperName": "javohir",
+        "newHelperPhone": "+998507278483",
+        "newHelperPassword": "2",
+        "role": "SHOP_OWNER"
       }
     },
     {
@@ -61,6 +98,47 @@
         "state": "super_admin_menu",
         "password": "1111",
         "phone": "+998946966636"
+      }
+    },
+    {
+      "id": "6619118781:6619118781",
+      "data": {
+        "state": "shop_owner_profile",
+        "password": "22",
+        "phone": "+998907533231",
+        "role": "SHOP_HELPER"
+      }
+    },
+    {
+      "id": "2135658829:2135658829",
+      "data": {
+        "state": "shop_owner_menu",
+        "password": "333",
+        "phone": "+998930055763",
+        "role": "SHOP_OWNER",
+        "newDebtorName": "Abdurahonov Javohir",
+        "newDebtorPhone": "+998999999999",
+        "newDebtorAddress": "Samarqnd darvoza"
+      }
+    },
+    {
+      "id": "5274992786:5274992786",
+      "data": {
+        "state": "shop_owner_menu",
+        "password": "22",
+        "phone": "+998915491778",
+        "role": "SHOP_OWNER"
+      }
+    },
+    {
+      "id": "7235463388:7235463388",
+      "data": {
+        "state": "shop_owner_menu",
+        "password": "22",
+        "phone": "+998999095064",
+        "role": "SHOP_OWNER",
+        "newDebtorName": "Ahrorbek",
+        "newHelperName": "Abbosbek"
       }
     }
   ]

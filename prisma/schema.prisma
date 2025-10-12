@@ -24,6 +24,8 @@ enum Role {
 enum DebtStatus {
   UNPAID
   PAID
+  CLOSED
+  OPEN
 }
 
 model User {
@@ -53,11 +55,12 @@ model Shop {
 model Debt {
   id        String     @id @default(uuid())
   amount    Int
+  shopId    String? // 🔹 optional
   note      String?
   status    DebtStatus @default(UNPAID)
   createdAt DateTime   @default(now())
 
-  debtorId String // 🔴 majburiy
+  debtorId String
   debtor   Debtor @relation(fields: [debtorId], references: [id])
 
   payments Payment[]

@@ -120,12 +120,14 @@ export class AuthHandler {
 
     if (!phone) return;
 
+    // Telefon formatlash
     if (phone.startsWith('0')) phone = '+998' + phone.slice(1);
     if (!phone.startsWith('+')) phone = '+' + phone;
 
     const password = session.password?.trim();
     session.phone = phone;
 
+    // Foydalanuvchini bazadan topish
     const user = await this.prisma.user.findFirst({ where: { phone } });
     if (!user) {
       await ctx.reply(
@@ -135,6 +137,7 @@ export class AuthHandler {
       return;
     }
 
+    // Parolni tekshirish
     const isPasswordCorrect = await bcrypt.compare(password, user.password);
     if (!isPasswordCorrect) {
       await ctx.reply(
@@ -144,24 +147,27 @@ export class AuthHandler {
       return;
     }
 
+    // Login muvaffaqiyatli
     await ctx.reply(
       `Salom ${user.name || 'Foydalanuvchi'}, siz muvaffaqiyatli login qildingiz!`,
       Markup.removeKeyboard(),
     );
 
-    // 🔹 Roli bo‘yicha menu ko‘rsatish
-    if (user.role === 'SUPER_ADMIN') {
-      session.state = 'super_admin_menu';
-      if (!this.superAdminHandler)
-        throw new Error('SuperAdminHandler inject qilinmagan!');
-      await this.superAdminHandler.showMenu(ctx, session);
-    } else if (user.role === 'SHOP_OWNER') {
-      session.state = 'shop_owner_menu';
-      if (!this.shopOwnerHandler)
-        throw new Error('ShopOwnerHandler inject qilinmagan!');
-      await this.shopOwnerHandler.showMenu(ctx, session);
-    } else {
+    // sessionga role berish
+    session.role = user.role as SessionData['role'];
+
+    if (!session.role) {
       await ctx.reply('Roli aniqlanmadi. Admin bilan bog‘laning.');
+      return;
+    }
+
+    // Rolega qarab menyu ochish
+    if (session.role === 'SUPER_ADMIN') {
+      session.state = 'super_admin_menu';
+      await this.superAdminHandler.showMenu(ctx, session);
+    } else if (['SHOP_OWNER', 'SHOP_HELPER'].includes(session.role)) {
+      session.state = 'shop_owner_menu';
+      await this.shopOwnerHandler.showMenu(ctx, session);
     }
   }
 }
