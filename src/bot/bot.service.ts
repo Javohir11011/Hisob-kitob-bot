@@ -47,7 +47,6 @@ export class BotService implements OnModuleInit {
   }
 
   private setupCommands() {
-    
     // --- START ---
     this.bot.start(async (ctx) => {
       try {
@@ -199,12 +198,16 @@ export class BotService implements OnModuleInit {
     this.bot.on('callback_query', async (ctx: any) => {
       try {
         const session = ctx.session as SessionData;
+
+        // 1️⃣ Shop Owner callback
         await this.shopOwnerHandler.handleCallbackQuery(ctx, session);
+
+        // 2️⃣ Super Admin callback
+        await this.superAdminHandler.handleCallbackQuery(ctx, session);
       } catch (err) {
         console.error('❌ callback_query error:', err);
       }
     });
-
     // --- INLINE ACTIONS (addDebt) ---
     this.bot.action(/addDebt:(.+)/, async (ctx: any) => {
       try {

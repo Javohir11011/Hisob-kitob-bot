@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
-import { Context, Markup } from 'telegraf';
+import { Context, Markup, Context as TelegrafContext } from 'telegraf';
 import { PrismaService } from '../../core/prisma.service';
 import { SessionData } from '../states/session.data';
 
@@ -27,12 +27,8 @@ export class SuperAdminHandler {
   async handleMenu(ctx: Context, session: SessionData) {
     if (session.state !== 'super_admin_menu') return;
 
-    const text =
-      ctx.message &&
-      'text' in ctx.message &&
-      typeof ctx.message.text === 'string'
-        ? ctx.message.text.trim()
-        : undefined;
+    if (!ctx.message || !('text' in ctx.message)) return;
+    const text = (ctx.message as { text: string }).text.trim();
 
     switch (text) {
       case '📊 Statistika':
@@ -54,7 +50,14 @@ export class SuperAdminHandler {
         break;
 
       case '⚙️ Sozlamalar':
-        await ctx.reply('⚙️ Sozlamalar hali tayyor emas.');
+        session.state = 'updating_own_info';
+        await ctx.reply(
+          'Qaysi maydonni o‘zgartirmoqchisiz?',
+          Markup.keyboard([
+            ['👤 Ism', '📞 Telefon', '🔑 Parol'],
+            ['❌ Bekor qilish'],
+          ]).resize(),
+        );
         break;
 
       case '👤 Profil':
@@ -74,14 +77,74 @@ export class SuperAdminHandler {
     }
   }
 
+  async handleText(ctx: TelegrafContext, session: SessionData): Promise<void> {
+    if (!ctx.message || !('text' in ctx.message)) return;
+    const text = ctx.message.text.trim();
+
+    switch (session.state) {
+      case 'super_admin_menu':
+        return this.handleMenu(ctx, session);
+
+      case 'updating_own_info':
+        if (text === '❌ Bekor qilish') {
+          session.state = 'super_admin_menu';
+          return this.showMenu(ctx, session);
+        }
+        if (text === '👤 Ism') {
+          session.state = 'updating_own_name';
+          await ctx.reply('Yangi ismingizni kiriting:');
+        }
+        if (text === '📞 Telefon') {
+          session.state = 'updating_own_phone';
+          await ctx.reply(
+            'Yangi telefon raqamingizni kiriting (+998XXXXXXXXX):',
+          );
+        }
+        if (text === '🔑 Parol') {
+          session.state = 'updating_own_password';
+          await ctx.reply('Yangi parolni kiriting:');
+        }
+        break;
+
+      case 'updating_own_name':
+        await this.prisma.user.update({
+          where: { phone: session.phone },
+          data: { name: text },
+        });
+        session.state = 'super_admin_menu';
+        await ctx.reply(`✅ Ismingiz "${text}" ga o‘zgartirildi`);
+        return this.showMenu(ctx, session);
+
+      case 'updating_own_phone':
+        let phone = text.startsWith('0') ? '+998' + text.slice(1) : text;
+        if (!phone.startsWith('+')) phone = '+' + phone;
+        if (!/^\+998\d{9}$/.test(phone)) {
+          await ctx.reply('❌ Telefon noto‘g‘ri formatda. Qayta kiriting.');
+        }
+        await this.prisma.user.update({
+          where: { phone: session.phone },
+          data: { phone },
+        });
+        session.phone = phone;
+        session.state = 'super_admin_menu';
+        await ctx.reply(`✅ Telefon raqamingiz o‘zgartirildi: ${phone}`);
+        return this.showMenu(ctx, session);
+
+      case 'updating_own_password':
+        const hashed = await bcrypt.hash(text, 10);
+        await this.prisma.user.update({
+          where: { phone: session.phone },
+          data: { password: hashed },
+        });
+        session.state = 'super_admin_menu';
+        await ctx.reply('✅ Parolingiz yangilandi');
+        return this.showMenu(ctx, session);
+    }
+  }
   // 🔹 Shop Owner qo‘shish jarayoni
   async handleAddOwner(ctx: Context, session: SessionData) {
-    const text =
-      ctx.message &&
-      'text' in ctx.message &&
-      typeof ctx.message.text === 'string'
-        ? ctx.message.text.trim()
-        : undefined;
+    if (!ctx.message || !('text' in ctx.message)) return;
+    const text = (ctx.message as { text: string }).text.trim();
 
     if (!text) return;
 
@@ -95,19 +158,20 @@ export class SuperAdminHandler {
         session.newOwnerName = text;
         session.state = 'adding_owner_phone';
         await ctx.reply(
-          'Telefon raqamini kiriting (+998XXXXXXXXX):',
+          'Telefon raqamini kiriting. Format:\n+998XXXXXXXXX (O‘zbekiston) yoki +7XXXXXXXXXX (Rossiya)',
           Markup.keyboard([['❌ Bekor qilish']]).resize(),
         );
         break;
 
       case 'adding_owner_phone':
         let phone = text;
+
         if (phone.startsWith('0')) phone = '+998' + phone.slice(1);
         if (!phone.startsWith('+')) phone = '+' + phone;
 
-        if (!/^\+998\d{9}$/.test(phone)) {
+        if (!/^\+998\d{9}$/.test(phone) && !/^\+7\d{10}$/.test(phone)) {
           await ctx.reply(
-            '❌ Telefon raqam noto‘g‘ri formatda. +998XXXXXXXXX kiriting.',
+            '❌ Telefon raqam noto‘g‘ri formatda.\n+998XXXXXXXXX yoki +7XXXXXXXXXX',
           );
           return;
         }
@@ -141,7 +205,7 @@ export class SuperAdminHandler {
         session.newOwnerShop = text;
         session.state = 'adding_owner_shop_address';
         await ctx.reply(
-          'Dokon manzilini kiriting (agar bo‘lmasa bo‘sh qoldiring):',
+          'Dokon manzilini kiriting:',
           Markup.keyboard([['❌ Bekor qilish']]).resize(),
         );
         break;
@@ -149,7 +213,6 @@ export class SuperAdminHandler {
       case 'adding_owner_shop_address':
         session.newOwnerShopAddress = text || '';
 
-        // Dokon yaratish
         const shop = await this.prisma.shop.create({
           data: {
             name: session.newOwnerShop ?? '',
@@ -157,7 +220,6 @@ export class SuperAdminHandler {
           },
         });
 
-        // Owner yaratish
         await this.prisma.user.create({
           data: {
             name: session.newOwnerName ?? '',
@@ -165,7 +227,7 @@ export class SuperAdminHandler {
             password: await bcrypt.hash(session.newOwnerPassword ?? '', 10),
             role: 'SHOP_OWNER',
             shopId: shop.id,
-            telegramId: null, // ❌ hozircha super adminning id’sini yozmaysiz
+            telegramId: null,
           },
         });
 
@@ -200,11 +262,7 @@ export class SuperAdminHandler {
 
     for (const owner of owners) {
       const totalDebt = owner.debts?.reduce((sum, d) => sum + d.amount, 0) ?? 0;
-      message += `👤 Ism: ${owner.name}\n`;
-      message += `📞 Tel: ${owner.phone}\n`;
-      message += `🏬 Dokon: ${owner.shop?.name ?? '-'}\n`;
-      message += `🕒 Ro‘yxatdan o‘tgan: ${owner.createdAt.toLocaleString()}\n`;
-      message += `💰 Umumiy qarz: ${totalDebt}\n\n`;
+      message += `👤 Ism: ${owner.name}\n📞 Tel: ${owner.phone}\n🏬 Dokon: ${owner.shop?.name ?? '-'}\n🕒 Ro‘yxatdan o‘tgan: ${owner.createdAt.toLocaleString()}\n💰 Umumiy qarz: ${totalDebt}\n\n`;
     }
 
     const totalOwners = await this.prisma.user.count({
@@ -245,13 +303,7 @@ export class SuperAdminHandler {
       return;
     }
 
-    const message = `
-👤 Ism: ${user.name}
-📞 Telefon: ${user.phone}
-🛡️ Roli: ${user.role}
-🕒 Ro‘yxatdan o‘tgan: ${user.createdAt.toLocaleString()}
-`;
-
+    const message = `👤 Ism: ${user.name}\n📞 Telefon: ${user.phone}\n🛡️ Roli: ${user.role}\n🕒 Ro‘yxatdan o‘tgan: ${user.createdAt.toLocaleString()}`;
     await ctx.reply(message);
   }
 
@@ -259,17 +311,14 @@ export class SuperAdminHandler {
   async handleSearchOwner(ctx: Context, session: SessionData) {
     if (session.state !== 'search_owner') return;
 
-    const text =
-      ctx.message &&
-      'text' in ctx.message &&
-      typeof ctx.message.text === 'string'
-        ? ctx.message.text.trim()
-        : undefined;
+    if (!ctx.message || !('text' in ctx.message)) return;
+    const text = (ctx.message as { text: string }).text.trim();
+
     if (!text) return;
 
     if (text === '❌ Bekor qilish') {
-      await this.showMenu(ctx, session);
       session.state = 'super_admin_menu';
+      await this.showMenu(ctx, session);
       return;
     }
 
@@ -291,7 +340,7 @@ export class SuperAdminHandler {
 
     for (const owner of owners) {
       const totalDebt = owner.debts?.reduce((sum, d) => sum + d.amount, 0) ?? 0;
-      const message = `👤 Ism: ${owner.name ?? '-'}\n📞 Tel: ${owner.phone ?? '-'}\n🏬 Dokon: ${owner.shop?.name ?? '-'}\n💰 Umumiy qarz: ${totalDebt}`;
+      const message = `👤 Ism: ${owner.name}\n📞 Tel: ${owner.phone}\n🏬 Dokon: ${owner.shop?.name ?? '-'}\n💰 Umumiy qarz: ${totalDebt}`;
 
       const keyboard = Markup.inlineKeyboard([
         [
@@ -309,26 +358,67 @@ export class SuperAdminHandler {
     );
   }
 
-  // 🔹 Update jarayoni
-  async handleUpdateOwner(ctx: Context, session: SessionData, ownerId: string) {
-    session.tempOwnerId = ownerId;
-    session.state = 'updating_owner';
-    await ctx.reply(
-      'Yangilamoqchi bo‘lgan maydonni tanlang:',
-      Markup.inlineKeyboard([
-        [Markup.button.callback('👤 Ism', 'update_field_name')],
-        [Markup.button.callback('📞 Telefon', 'update_field_phone')],
-        [Markup.button.callback('🏬 Dokon', 'update_field_shop')],
-        [Markup.button.callback('❌ Bekor qilish', 'update_cancel')],
-      ]),
-    );
+  // 🔹 Callback query (Delete / Update / Update Field)
+  async handleCallbackQuery(ctx: any, session: SessionData) {
+    const data = ctx.callbackQuery?.data;
+    if (!data) return;
+
+    // Delete owner
+    if (data.startsWith('delete_owner_')) {
+      const ownerId = data.replace('delete_owner_', '');
+      await this.prisma.user.delete({ where: { id: ownerId } });
+      await ctx.answerCbQuery('✅ Owner o‘chirildi');
+      await ctx.editMessageReplyMarkup(undefined); // inline tugmalarni olib tashlash
+      return;
+    }
+
+    // Update owner start
+    if (data.startsWith('update_owner_')) {
+      const ownerId = data.replace('update_owner_', '');
+      session.tempOwnerId = ownerId;
+      session.state = 'updating_owner_field';
+      await ctx.answerCbQuery('✏️ Yangilash jarayoni boshlandi');
+      await ctx.reply(
+        'Yangilamoqchi bo‘lgan maydonni tanlang:',
+        Markup.inlineKeyboard([
+          [Markup.button.callback('👤 Ism', 'update_field_name')],
+          [Markup.button.callback('📞 Telefon', 'update_field_phone')],
+          [Markup.button.callback('🏬 Dokon', 'update_field_shop')],
+          [Markup.button.callback('❌ Bekor qilish', 'update_field_cancel')],
+        ]),
+      );
+      return;
+    }
+
+    // Update field selection
+    if (data.startsWith('update_field_')) {
+      if (!session.tempOwnerId) {
+        await ctx.answerCbQuery('❌ Owner tanlanmagan');
+        return;
+      }
+
+      const field = data.replace('update_field_', '');
+      if (field === 'cancel') {
+        session.state = 'super_admin_menu';
+        session.tempOwnerId = undefined;
+        session.updateField = undefined;
+        await ctx.answerCbQuery('❌ Yangilash bekor qilindi');
+        return;
+      }
+
+      session.updateField = field; // name, phone, shop
+      session.state = 'updating_owner_field';
+      await ctx.answerCbQuery(`✏️ ${field} yangilash uchun matn kiriting`);
+    }
   }
 
+  // 🔹 Saqlash (update_field)
   async saveOwnerField(ctx: Context, session: SessionData) {
     if (!ctx.message || !('text' in ctx.message)) return;
+    const text = (ctx.message as { text: string }).text.trim();
+
     if (!session.tempOwnerId || !session.updateField) return;
 
-    const text = ctx.message.text.trim();
     const ownerId = session.tempOwnerId;
     const field = session.updateField;
 
