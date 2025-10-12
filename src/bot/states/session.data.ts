@@ -18,6 +18,10 @@ export type SessionData = {
     | 'adding_helper_phone'
     | 'adding_helper_password'
     | 'shop_owner_profile'
+    | 'updating_own_info'
+    | 'updating_own_name'
+    | 'updating_own_phone'
+    | 'updating_own_password'
 
     // 🔹 Debtor (qarzdorlar bilan ishlash)
     | 'adding_debtor_name'
