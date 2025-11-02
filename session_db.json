@@ -9,12 +9,7 @@
         "state": "super_admin_menu",
         "role": "SUPER_ADMIN",
         "tempDebtorId": "197286f4-63ca-429e-bed9-fcdd3f63b388",
-        "tempDebtAmount": 20000,
-        "newOwnerName": "Karmixon",
-        "newOwnerPhone": "+79852659344",
-        "newOwnerPassword": "3",
-        "newOwnerShop": "KKK",
-        "newOwnerShopAddress": "llll"
+        "tempDebtAmount": 20000
       }
     },
     {
@@ -53,7 +48,7 @@
     {
       "id": "1900713644:1900713644",
       "data": {
-        "state": "shop_owner_menu",
+        "state": "debtor_menu",
         "password": "2",
         "phone": "+998915319081",
         "newOwnerName": "Abdulaziz",
@@ -61,11 +56,8 @@
         "newOwnerPassword": "2222",
         "newOwnerShop": "Durex",
         "newOwnerShopAddress": "Tashkent",
-        "tempDebtAmount": 700000,
-        "tempDebtorId": "74bafde2-199d-4bea-97c8-46f4ecf7c9ee",
-        "newDebtorName": "olimxon",
-        "newDebtorPhone": "+998946966638",
-        "newDebtorAddress": "jj",
+        "tempDebtAmount": 500000,
+        "tempDebtorId": "01031ef7-b921-4cf3-80a0-bb48560c1f84",
         "tempDebtorList": [
           {
             "id": "bbe9ac92-dfef-4f7a-bc85-4b6bd949a5c9",

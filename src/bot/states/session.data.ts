@@ -47,7 +47,8 @@ export type SessionData = {
     | 'paying_debt_amount'
     | 'updating_debt'
     | 'editing_debt'
-    | 'awaiting_debtor_selection';
+    | 'awaiting_debtor_selection'
+    | 'adding_debtor_password';
 
   // --- General session data ---
   userId: string;
@@ -86,6 +87,7 @@ export type SessionData = {
   newDebtorName?: string;
   newDebtorPhone?: string;
   newDebtorAddress?: string;
+  newDebtorPassword?: string;
 
   // --- Debt qo‘shish ---
   tempDebtName?: string; // Qarzdor nomi

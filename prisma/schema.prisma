@@ -71,14 +71,15 @@ model Debt {
 model Debtor {
   id         String   @id @default(uuid())
   name       String
+  password   String?
   phone      String   @unique
   telegramId String?  @unique
   address    String?
   createdAt  DateTime @default(now())
 
-  debts  Debt[]
   shopId String
   shop   Shop   @relation(fields: [shopId], references: [id])
+  debts  Debt[]
 }
 
 model Payment {

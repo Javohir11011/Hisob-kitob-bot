@@ -25,6 +25,7 @@ export class ShopOwnerHandler {
         .persistent(),
     );
   }
+  
 
   /* -----------------------
      PROFIL
@@ -87,6 +88,7 @@ export class ShopOwnerHandler {
       /* 🔸 Qarzdor qo‘shish */
       case 'adding_debtor_name':
       case 'adding_debtor_phone':
+      case 'adding_debtor_password':
       case 'adding_debtor_address':
         return this.handleAddDebtor(ctx, session);
 
@@ -240,85 +242,203 @@ export class ShopOwnerHandler {
   /* -----------------------
    QARZDOR CRUD
 ----------------------- */
+  // startAddDebtor funksiyasi (o'zgarmaydi)
   async startAddDebtor(ctx: Context, session: SessionData): Promise<void> {
     session.state = 'adding_debtor_name';
     await ctx.reply(
-      'Yangi qarzdor ismini kiriting:',
+      '🧾 Yangi qarzdor ismini kiriting:',
       Markup.keyboard([['❌ Bekor qilish']]).resize(),
     );
   }
 
+  // handleAddDebtor — to‘liq ishlaydigan, loglar bilan versiya
+  // ✅ handleAddDebtor — to‘liq, TypeScript xatosiz, loglar bilan versiya
   async handleAddDebtor(ctx: Context, session: SessionData): Promise<void> {
     if (!ctx.message || !('text' in ctx.message)) return;
-    const text = ctx.message.text.trim();
-    if (text === '❌ Bekor qilish') return this.showMenu(ctx, session);
+    const raw = ctx.message.text.trim();
+
+    // universal "bekor qilish"
+    if (raw === '❌ Bekor qilish') {
+      session.state = 'shop_owner_menu';
+      Object.assign(ctx.session, session);
+      await (ctx.session as any)?.save?.();
+      await this.showMenu(ctx, session);
+      return;
+    }
+
+    // console.log('📨 Kiritilgan matn:', raw);
+    // console.log('📌 Joriy state:', session.state);
 
     switch (session.state) {
-      case 'adding_debtor_name':
-        session.newDebtorName = text;
+      // 1️⃣ Qarzdor ismi
+      case 'adding_debtor_name': {
+        session.newDebtorName = raw;
         session.state = 'adding_debtor_phone';
+        // console.log('➡️ State o‘zgardi: adding_debtor_phone');
+
+        Object.assign(ctx.session, session);
+        await (ctx.session as any)?.save?.();
+
         await ctx.reply(
           '📞 Qarzdor telefon raqamini kiriting (+998XXXXXXXXX yoki +7XXXXXXXXXX):',
         );
         return;
+      }
 
-      case 'adding_debtor_phone':
-        let phone = text.replace(/\s+/g, '');
-
-        // Uzbekistan va Rossiya raqamlari formatlash
+      // 2️⃣ Telefon
+      case 'adding_debtor_phone': {
+        let phone = raw.replace(/\s+/g, '');
         if (phone.startsWith('0')) phone = '+998' + phone.slice(1);
         if (!phone.startsWith('+')) phone = '+' + phone;
 
+        // console.log('📞 Kiritilgan telefon:', phone);
+
         const uzPattern = /^\+998\d{9}$/;
         const ruPattern = /^\+7\d{10}$/;
-
         if (!uzPattern.test(phone) && !ruPattern.test(phone)) {
-          await ctx.reply('❌ Telefon noto‘g‘ri formatda. Qayta kiriting.');
+          console.log('❌ Telefon formati noto‘g‘ri');
+          await ctx.reply('❌ Telefon noto‘g‘ri formatda. Qayta kiriting:');
           return;
         }
 
-        // Qarzdor allaqachon mavjudligini tekshirish
-        const existingDebtor = await this.prisma.debtor.findUnique({
+        const existing = await this.prisma.debtor.findUnique({
           where: { phone },
         });
-
-        if (existingDebtor) {
+        if (existing) {
           await ctx.reply(
-            '❌ Bu telefon raqam bilan qarzdor allaqachon mavjud. Iltimos, boshqa raqam kiriting.',
+            '❌ Bu telefon raqam bilan qarzdor allaqachon mavjud.',
           );
           return;
         }
 
         session.newDebtorPhone = phone;
         session.state = 'adding_debtor_address';
+        // console.log('➡️ State o‘zgardi: adding_debtor_address');
+
+        Object.assign(ctx.session, session);
+        await (ctx.session as any)?.save?.();
+
         await ctx.reply('🏠 Qarzdor manzilini kiriting:');
         return;
+      }
 
-      case 'adding_debtor_address':
-        session.newDebtorAddress = text;
-
-        // Shop egasini olish
-        const shopOwner = await this.prisma.user.findFirst({
-          where: { phone: session.phone },
+      // 3️⃣ Manzil
+      case 'adding_debtor_address': {
+        session.newDebtorAddress = raw;
+        session.state = 'adding_debtor_password';
+        console.log('➡️ State o‘zgardi: adding_debtor_password');
+        console.log('📦 Hozirgacha to‘plangan maʼlumotlar:', {
+          name: session.newDebtorName,
+          phone: session.newDebtorPhone,
+          address: session.newDebtorAddress,
         });
-        if (!shopOwner?.shopId) {
-          await ctx.reply('❌ Sizning shopingiz topilmadi.');
+
+        Object.assign(ctx.session, session);
+        await (ctx.session as any)?.save?.();
+
+        await ctx.reply(
+          '🔑 Qarzdor uchun parolni kiriting (kamida 4 belgidan):',
+        );
+        return;
+      }
+
+      // 4️⃣ Parol
+      case 'adding_debtor_password': {
+        console.log('🧩 adding_debtor_password state ichida');
+        if (!raw || raw.length < 4) {
+          await ctx.reply(
+            '❌ Parol kamida 4 belgidan iborat bo‘lishi kerak. Qayta kiriting:',
+          );
           return;
         }
 
-        // Yangi qarzdor qo‘shish
-        await this.prisma.debtor.create({
-          data: {
-            name: session.newDebtorName ?? '',
-            phone: session.newDebtorPhone ?? '',
-            address: session.newDebtorAddress ?? '',
-            shopId: shopOwner.shopId,
-          },
-        });
+        session.newDebtorPassword = raw;
+        // console.log('🔐 Parol saqlandi:', raw);
 
-        await ctx.reply(`✅ Qarzdor "${session.newDebtorName}" qo‘shildi`);
+        Object.assign(ctx.session, session);
+        await (ctx.session as any)?.save?.();
+
+        const shopOwner = await this.prisma.user.findFirst({
+          where: { phone: session.phone },
+        });
+        console.log('👤 Shop owner topildi:', shopOwner);
+
+        if (!shopOwner) {
+          await ctx.reply('❌ Sizning profilingiz topilmadi.');
+          session.state = 'shop_owner_menu';
+          Object.assign(ctx.session, session);
+          await (ctx.session as any)?.save?.();
+          await this.showMenu(ctx, session);
+          return;
+        }
+
+        if (!shopOwner.shopId) {
+          await ctx.reply('❌ Sizga tegishli do‘kon topilmadi.');
+          session.state = 'shop_owner_menu';
+          Object.assign(ctx.session, session);
+          await (ctx.session as any)?.save?.();
+          await this.showMenu(ctx, session);
+          return;
+        }
+
+        const hashedPassword = await bcrypt.hash(session.newDebtorPassword, 10);
+
+        // console.log("🧾 Debtor yaratish ma'lumotlari:", {
+        //   name: session.newDebtorName,
+        //   phone: session.newDebtorPhone,
+        //   address: session.newDebtorAddress,
+        //   password: hashedPassword,
+        //   shopId: shopOwner.shopId,
+        // });
+
+        try {
+          const newDebtor = await this.prisma.debtor.create({
+            data: {
+              name: session.newDebtorName ?? '',
+              phone: session.newDebtorPhone ?? '',
+              address: session.newDebtorAddress ?? '',
+              password: hashedPassword,
+              shopId: shopOwner.shopId,
+            },
+          });
+
+          console.log('✅ Debtor bazaga saqlandi:', newDebtor);
+
+          await ctx.reply(
+            `✅ Qarzdor muvaffaqiyatli qo‘shildi!\n\n👤 <b>${session.newDebtorName}</b>\n📞 ${session.newDebtorPhone}\n🏠 ${session.newDebtorAddress}`,
+            {
+              parse_mode: 'HTML',
+              ...Markup.keyboard([['⬅️ Orqaga']]).resize(),
+            },
+          );
+        } catch (err: any) {
+          console.error('❌ Debtor qo‘shishda xatolik:', err.message);
+          console.error(err);
+          await ctx.reply('❌ Qarzdorni saqlashda xatolik yuz berdi.');
+        }
+
+        // 🧹 Sessionni tozalaymiz
+        delete session.newDebtorName;
+        delete session.newDebtorPhone;
+        delete session.newDebtorAddress;
+        delete session.newDebtorPassword;
+
+        session.state = 'shop_owner_menu';
+        Object.assign(ctx.session, session);
+        await (ctx.session as any)?.save?.();
+
         await this.showMenu(ctx, session);
         return;
+      }
+
+      default: {
+        console.log('⚙️ Default holat. State:', session.state);
+        session.state = 'shop_owner_menu';
+        Object.assign(ctx.session, session);
+        await (ctx.session as any)?.save?.();
+        await this.showMenu(ctx, session);
+        return;
+      }
     }
   }
 
