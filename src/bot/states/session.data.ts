@@ -26,6 +26,7 @@ export type SessionData = {
     | 'editing_debtor_name'
     | 'editing_debtor_phone'
     | 'debtor_menu'
+    | 'debtor_main_menu'
     | 'editing_debtor'
     | 'paying_debt'
     | 'awaiting_debtor_for_payment'
@@ -35,9 +36,14 @@ export type SessionData = {
     | 'adding_debtor_name'
     | 'adding_debtor_phone'
     | 'adding_debtor_address'
+    | 'adding_debtor_password'
     | 'search_debtor_for_debt'
     | 'selecting_debtor'
     | 'adding_debtor_initial_debt'
+    | 'debtor_login_password'
+    | 'debtor_login_phone'
+    | 'debtor_main_menu'
+    | 'debtor_enter_payment'
 
     // 🔹 Debt (qarzlar bilan ishlash)
     | 'adding_debt_name'
@@ -47,15 +53,14 @@ export type SessionData = {
     | 'paying_debt_amount'
     | 'updating_debt'
     | 'editing_debt'
-    | 'awaiting_debtor_selection'
-    | 'adding_debtor_password';
+    | 'awaiting_debtor_selection';
 
   // --- General session data ---
   userId: string;
   phone?: string;
   password?: string;
   user?: any;
-  role?: 'SUPER_ADMIN' | 'SHOP_OWNER' | 'SHOP_HELPER'; // user roli
+  role?: 'SUPER_ADMIN' | 'SHOP_OWNER' | 'SHOP_HELPER' | 'DEBTOR'; // user roli
 
   tempOwnerId?: string; // Owner qo‘shishda vaqtinchalik
   updateField?: 'name' | 'phone' | 'shop';
@@ -69,6 +74,7 @@ export type SessionData = {
     phone?: string;
     address?: string | null;
   }>;
+  debtorPassword?: string;
 
   // --- Owner qo‘shish ---
   newOwnerName?: string;
@@ -95,5 +101,6 @@ export type SessionData = {
   tempDebtNote?: string;
   newDebtTitle?: string;
 
+  tempDebtId?: string;
   shopId?: string; // Hozirgi shop id
 };

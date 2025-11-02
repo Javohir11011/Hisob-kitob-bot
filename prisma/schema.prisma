@@ -82,10 +82,12 @@ model Debtor {
   debts  Debt[]
 }
 
+
 model Payment {
-  id        String   @id @default(uuid())
-  amount    Int
-  createdAt DateTime @default(now())
-  debtId    String
+  id        String   @id @default(cuid())
   debt      Debt     @relation(fields: [debtId], references: [id])
+  debtId    String
+  amount    Float
+  approved  Boolean?  @default(false) // SHOP_OWNER tasdiqlashini kutadi
+  createdAt DateTime @default(now())
 }

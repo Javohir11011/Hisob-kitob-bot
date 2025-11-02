@@ -26,7 +26,9 @@ export class AuthHandler {
     await ctx.reply(
       'Assalomu alaykum 👋 Qarzingizni boshqarish botiga xush kelibsiz.',
     );
-    await ctx.reply('Kirish uchun /login yozing.');
+    await ctx.reply(
+      'Kirish uchun /login yozing\nYoki qarzdor sifatida kirish uchun /login_debtor yozing',
+    );
   }
 
   // /login komandasi
