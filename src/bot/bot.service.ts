@@ -135,6 +135,7 @@ export class BotService implements OnModuleInit {
             'adding_debtor_name',
             'adding_debtor_phone',
             'adding_debtor_address',
+            'adding_debtor_password',
             'adding_debt_amount',
             'adding_debt_note',
             'search_debtor_for_debt',
@@ -149,6 +150,7 @@ export class BotService implements OnModuleInit {
               case 'adding_helper_name':
               case 'adding_helper_phone':
               case 'adding_helper_password':
+              case 'adding_debtor_password':
               case 'adding_debtor_name':
               case 'adding_debtor_phone':
               case 'adding_debtor_address':
