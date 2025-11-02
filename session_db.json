@@ -81,16 +81,24 @@
         "newHelperName": "javohir",
         "newHelperPhone": "+998507278483",
         "newHelperPassword": "2",
-        "role": "SHOP_OWNER",
-        "editingDebtorId": "74bafde2-199d-4bea-97c8-46f4ecf7c9ee"
+        "role": "DEBTOR",
+        "editingDebtorId": "74bafde2-199d-4bea-97c8-46f4ecf7c9ee",
+        "newDebtorName": "javohir",
+        "newDebtorPhone": "+998908717305",
+        "newDebtorAddress": "qash",
+        "debtorPassword": "1232",
+        "debtorId": "01031ef7-b921-4cf3-80a0-bb48560c1f84"
       }
     },
     {
       "id": "6347903736:6347903736",
       "data": {
-        "state": "super_admin_menu",
-        "password": "1111",
-        "phone": "+998946966636"
+        "state": "debtor_menu",
+        "password": "1232",
+        "phone": "+998908717304",
+        "debtorPassword": "1232",
+        "role": "DEBTOR",
+        "debtorId": "01031ef7-b921-4cf3-80a0-bb48560c1f84"
       }
     },
     {

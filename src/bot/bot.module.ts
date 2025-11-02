@@ -1,11 +1,10 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { TelegrafModule } from 'nestjs-telegraf';
-import { session } from 'telegraf';
 import { PrismaService } from '../core/prisma.service';
 import { BotService } from './bot.service';
-import { BotUpdate } from './bot.update';
 import { AuthHandler } from './handlers/auth.handlers';
+import { DebtorLoginHandler } from './handlers/debtor-login.handlers';
+import { DebtorHandler } from './handlers/debtor.handlers';
 import { ShopOwnerHandler } from './handlers/shop-owner.handlers';
 import { SuperAdminHandler } from './handlers/super-admin.handler';
 
@@ -16,7 +15,9 @@ import { SuperAdminHandler } from './handlers/super-admin.handler';
     AuthHandler,
     SuperAdminHandler,
     ShopOwnerHandler,
+    DebtorHandler,
     PrismaService,
+    DebtorLoginHandler,
   ],
 })
 export class BotModule {}
