@@ -25,7 +25,6 @@ export class ShopOwnerHandler {
         .persistent(),
     );
   }
-  
 
   /* -----------------------
      PROFIL
@@ -242,7 +241,6 @@ export class ShopOwnerHandler {
   /* -----------------------
    QARZDOR CRUD
 ----------------------- */
-  // startAddDebtor funksiyasi (o'zgarmaydi)
   async startAddDebtor(ctx: Context, session: SessionData): Promise<void> {
     session.state = 'adding_debtor_name';
     await ctx.reply(
@@ -251,194 +249,101 @@ export class ShopOwnerHandler {
     );
   }
 
-  // handleAddDebtor — to‘liq ishlaydigan, loglar bilan versiya
-  // ✅ handleAddDebtor — to‘liq, TypeScript xatosiz, loglar bilan versiya
-  async handleAddDebtor(ctx: Context, session: SessionData): Promise<void> {
+  async handleAddDebtor(ctx: Context, session: SessionData) {
     if (!ctx.message || !('text' in ctx.message)) return;
-    const raw = ctx.message.text.trim();
+    const text = ctx.message.text.trim();
 
-    // universal "bekor qilish"
-    if (raw === '❌ Bekor qilish') {
+    if (text === '❌ Bekor qilish') {
       session.state = 'shop_owner_menu';
-      Object.assign(ctx.session, session);
-      await (ctx.session as any)?.save?.();
-      await this.showMenu(ctx, session);
+      session.newDebtorName = undefined;
+      session.newDebtorPhone = undefined;
+      session.newDebtorAddress = undefined;
+      session.newDebtorPassword = undefined;
+      await ctx.reply('❌ Qarzdor qo‘shish bekor qilindi.');
       return;
     }
 
-    // console.log('📨 Kiritilgan matn:', raw);
-    // console.log('📌 Joriy state:', session.state);
-
     switch (session.state) {
-      // 1️⃣ Qarzdor ismi
-      case 'adding_debtor_name': {
-        session.newDebtorName = raw;
+      case 'adding_debtor_name':
+        session.newDebtorName = text;
         session.state = 'adding_debtor_phone';
-        // console.log('➡️ State o‘zgardi: adding_debtor_phone');
-
-        Object.assign(ctx.session, session);
-        await (ctx.session as any)?.save?.();
-
+        console.log('📝 State changed to adding_debtor_phone');
         await ctx.reply(
           '📞 Qarzdor telefon raqamini kiriting (+998XXXXXXXXX yoki +7XXXXXXXXXX):',
         );
-        return;
-      }
+        break;
 
-      // 2️⃣ Telefon
-      case 'adding_debtor_phone': {
-        let phone = raw.replace(/\s+/g, '');
-        if (phone.startsWith('0')) phone = '+998' + phone.slice(1);
-        if (!phone.startsWith('+')) phone = '+' + phone;
-
-        // console.log('📞 Kiritilgan telefon:', phone);
-
-        const uzPattern = /^\+998\d{9}$/;
-        const ruPattern = /^\+7\d{10}$/;
-        if (!uzPattern.test(phone) && !ruPattern.test(phone)) {
-          console.log('❌ Telefon formati noto‘g‘ri');
-          await ctx.reply('❌ Telefon noto‘g‘ri formatda. Qayta kiriting:');
-          return;
-        }
-
-        const existing = await this.prisma.debtor.findUnique({
-          where: { phone },
-        });
-        if (existing) {
-          await ctx.reply(
-            '❌ Bu telefon raqam bilan qarzdor allaqachon mavjud.',
-          );
-          return;
-        }
-
-        session.newDebtorPhone = phone;
+      case 'adding_debtor_phone':
+        session.newDebtorPhone = text;
         session.state = 'adding_debtor_address';
-        // console.log('➡️ State o‘zgardi: adding_debtor_address');
-
-        Object.assign(ctx.session, session);
-        await (ctx.session as any)?.save?.();
-
+        console.log('📝 State changed to adding_debtor_address');
         await ctx.reply('🏠 Qarzdor manzilini kiriting:');
-        return;
-      }
+        break;
 
-      // 3️⃣ Manzil
-      case 'adding_debtor_address': {
-        session.newDebtorAddress = raw;
+      case 'adding_debtor_address':
+        session.newDebtorAddress = text;
         session.state = 'adding_debtor_password';
-        console.log('➡️ State o‘zgardi: adding_debtor_password');
-        console.log('📦 Hozirgacha to‘plangan maʼlumotlar:', {
+        console.log('📝 State changed to adding_debtor_password');
+        await ctx.reply('🔑 Qarzdor uchun parol kiriting (kamida 4 belgidan):');
+        break;
+
+      case 'adding_debtor_password':
+        session.newDebtorPassword = text;
+
+        console.log('➡️ Collected info:', {
           name: session.newDebtorName,
           phone: session.newDebtorPhone,
           address: session.newDebtorAddress,
+          password: session.newDebtorPassword,
         });
 
-        Object.assign(ctx.session, session);
-        await (ctx.session as any)?.save?.();
-
-        await ctx.reply(
-          '🔑 Qarzdor uchun parolni kiriting (kamida 4 belgidan):',
-        );
-        return;
-      }
-
-      // 4️⃣ Parol
-      case 'adding_debtor_password': {
-        console.log('🧩 adding_debtor_password state ichida');
-        if (!raw || raw.length < 4) {
-          await ctx.reply(
-            '❌ Parol kamida 4 belgidan iborat bo‘lishi kerak. Qayta kiriting:',
-          );
-          return;
-        }
-
-        session.newDebtorPassword = raw;
-        // console.log('🔐 Parol saqlandi:', raw);
-
-        Object.assign(ctx.session, session);
-        await (ctx.session as any)?.save?.();
-
-        const shopOwner = await this.prisma.user.findFirst({
+        // Shop ownerni topamiz
+        const user = await this.prisma.user.findFirst({
           where: { phone: session.phone },
         });
-        console.log('👤 Shop owner topildi:', shopOwner);
 
-        if (!shopOwner) {
-          await ctx.reply('❌ Sizning profilingiz topilmadi.');
-          session.state = 'shop_owner_menu';
-          Object.assign(ctx.session, session);
-          await (ctx.session as any)?.save?.();
-          await this.showMenu(ctx, session);
-          return;
-        }
-
-        if (!shopOwner.shopId) {
-          await ctx.reply('❌ Sizga tegishli do‘kon topilmadi.');
-          session.state = 'shop_owner_menu';
-          Object.assign(ctx.session, session);
-          await (ctx.session as any)?.save?.();
-          await this.showMenu(ctx, session);
-          return;
-        }
-
-        const hashedPassword = await bcrypt.hash(session.newDebtorPassword, 10);
-
-        // console.log("🧾 Debtor yaratish ma'lumotlari:", {
-        //   name: session.newDebtorName,
-        //   phone: session.newDebtorPhone,
-        //   address: session.newDebtorAddress,
-        //   password: hashedPassword,
-        //   shopId: shopOwner.shopId,
-        // });
-
-        try {
-          const newDebtor = await this.prisma.debtor.create({
-            data: {
-              name: session.newDebtorName ?? '',
-              phone: session.newDebtorPhone ?? '',
-              address: session.newDebtorAddress ?? '',
-              password: hashedPassword,
-              shopId: shopOwner.shopId,
-            },
-          });
-
-          console.log('✅ Debtor bazaga saqlandi:', newDebtor);
-
+        if (!user?.shopId) {
           await ctx.reply(
-            `✅ Qarzdor muvaffaqiyatli qo‘shildi!\n\n👤 <b>${session.newDebtorName}</b>\n📞 ${session.newDebtorPhone}\n🏠 ${session.newDebtorAddress}`,
-            {
-              parse_mode: 'HTML',
-              ...Markup.keyboard([['⬅️ Orqaga']]).resize(),
-            },
+            '❌ Do‘kon topilmadi! Iltimos, telefon raqamingizni tekshiring.',
           );
-        } catch (err: any) {
-          console.error('❌ Debtor qo‘shishda xatolik:', err.message);
-          console.error(err);
-          await ctx.reply('❌ Qarzdorni saqlashda xatolik yuz berdi.');
+          session.state = 'shop_owner_menu';
+          return;
         }
 
-        // 🧹 Sessionni tozalaymiz
-        delete session.newDebtorName;
-        delete session.newDebtorPhone;
-        delete session.newDebtorAddress;
-        delete session.newDebtorPassword;
+        // Debtor yaratish
+        await this.prisma.debtor.create({
+          data: {
+            name: session.newDebtorName!,
+            phone: session.newDebtorPhone!,
+            address: session.newDebtorAddress,
+            password: session.newDebtorPassword!,
+            shop: { connect: { id: user.shopId } },
+          },
+        });
 
+        console.log('✅ Debtor created:', session.newDebtorName);
+
+        // Sessionni tozalaymiz
         session.state = 'shop_owner_menu';
-        Object.assign(ctx.session, session);
-        await (ctx.session as any)?.save?.();
+        session.newDebtorName = undefined;
+        session.newDebtorPhone = undefined;
+        session.newDebtorAddress = undefined;
+        session.newDebtorPassword = undefined;
 
-        await this.showMenu(ctx, session);
-        return;
-      }
+        await ctx.reply(
+          '✅ Qarzdor muvaffaqiyatli qo‘shildi!',
+          Markup.keyboard([
+            ['➕ Qarzdor qo‘shish'],
+            ['📋 Qarzdorlar ro‘yxati'],
+            ['🔙 Orqaga'],
+          ]).resize(),
+        );
+        break;
 
-      default: {
-        console.log('⚙️ Default holat. State:', session.state);
-        session.state = 'shop_owner_menu';
-        Object.assign(ctx.session, session);
-        await (ctx.session as any)?.save?.();
-        await this.showMenu(ctx, session);
-        return;
-      }
+      default:
+        console.log('❌ Unknown state:', session.state);
+        await ctx.reply('❌ Iltimos, menyudan tanlang.');
+        break;
     }
   }
 
@@ -488,6 +393,7 @@ export class ShopOwnerHandler {
         Markup.keyboard([['🔍 Qidirish'], ['↩️ Orqaga']]).resize(),
       );
     } catch (error) {
+      console.error('❌ showDebtors error:', error);
       await ctx.reply('⚠️ Qarzdorlarni yuklashda xatolik yuz berdi.');
     }
   }
@@ -511,6 +417,7 @@ export class ShopOwnerHandler {
     const shopOwner = await this.prisma.user.findFirst({
       where: { phone: session.phone },
     });
+
     if (!shopOwner?.shopId) {
       await ctx.reply('❌ Sizning shopingiz topilmadi.');
       return;
@@ -565,7 +472,7 @@ export class ShopOwnerHandler {
         debtor.address ?? 'Manzil yo‘q'
       }`,
       Markup.inlineKeyboard([
-        [Markup.button.callback('✏️ Tahrirlash', `editdeb_${debtor.id}`)],
+        // [Markup.button.callback('✏️ Tahrirlash', `editdeb_${debtor.id}`)],
         [Markup.button.callback('🗑 O‘chirish', `deldeb_${debtor.id}`)],
         [Markup.button.callback('↩️ Orqaga', 'back_to_debtors')],
       ]),
