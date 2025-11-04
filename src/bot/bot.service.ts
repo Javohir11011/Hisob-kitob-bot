@@ -75,6 +75,7 @@ export class BotService implements OnModuleInit {
       }
     });
 
+
     // --- TEXT HANDLER ---
     this.bot.on(['text'], async (ctx) => {
       const session = ctx.session as SessionData;
@@ -206,6 +207,7 @@ export class BotService implements OnModuleInit {
       await this.shopOwnerHandler.showAllDebts(ctx, debtorId);
       await ctx.answerCbQuery();
     });
+
 
     // Update
     // this.bot.action(/update_debtor_(.+)/, async (ctx) => {

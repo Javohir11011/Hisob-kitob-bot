@@ -153,14 +153,18 @@ export class ShopOwnerHandler {
   async handleAddDebtor(ctx: Context, session: SessionData) {
     if (!ctx.message || !('text' in ctx.message)) return;
     const text = ctx.message.text.trim();
+    if (!text) return;
 
+    // ❌ Bekor qilish
     if (text === '❌ Bekor qilish') {
       session.state = 'shop_owner_menu';
       session.newDebtorName = undefined;
       session.newDebtorPhone = undefined;
       session.newDebtorAddress = undefined;
       session.newDebtorPassword = undefined;
+
       await ctx.reply('❌ Qarzdor qo‘shish bekor qilindi.');
+      await this.showMenu(ctx, session);
       return;
     }
 
@@ -170,40 +174,82 @@ export class ShopOwnerHandler {
         session.state = 'adding_debtor_phone';
         await ctx.reply(
           '📞 Qarzdor telefon raqamini kiriting (+998XXXXXXXXX yoki +7XXXXXXXXXX):',
+          Markup.keyboard([['❌ Bekor qilish']]).resize(),
         );
         break;
-      case 'adding_debtor_phone':
-        session.newDebtorPhone = text;
-        session.state = 'adding_debtor_address';
-        await ctx.reply('🏠 Qarzdor manzilini kiriting:');
-        break;
-      case 'adding_debtor_address':
-        session.newDebtorAddress = text;
-        session.state = 'adding_debtor_password';
-        await ctx.reply('🔑 Qarzdor uchun parol kiriting (kamida 4 belgidan):');
-        break;
-      case 'adding_debtor_password':
-        session.newDebtorPassword = text;
 
-        const user = await this.prisma.user.findFirst({
-          where: { phone: session.phone },
-        });
-        if (!user?.shopId) {
-          await ctx.reply('❌ Do‘kon topilmadi!');
-          session.state = 'shop_owner_menu';
+      case 'adding_debtor_phone':
+        let phone = text;
+        if (phone.startsWith('0')) phone = '+998' + phone.slice(1);
+        if (!phone.startsWith('+')) phone = '+' + phone;
+
+        if (!/^\+998\d{9}$/.test(phone) && !/^\+7\d{10}$/.test(phone)) {
+          await ctx.reply(
+            '❌ Telefon raqam noto‘g‘ri formatda. Iltimos, +998XXXXXXXXX yoki +7XXXXXXXXXX kiriting.',
+          );
           return;
         }
 
-        await this.prisma.debtor.create({
+        const exists = await this.prisma.debtor.findFirst({ where: { phone } });
+        if (exists) {
+          await ctx.reply(
+            '❌ Bu raqam allaqachon mavjud. Boshqa raqam kiriting.',
+          );
+          return;
+        }
+
+        session.newDebtorPhone = phone;
+        session.state = 'adding_debtor_address';
+        await ctx.reply(
+          '🏠 Qarzdor manzilini kiriting:',
+          Markup.keyboard([['❌ Bekor qilish']]).resize(),
+        );
+        break;
+
+      case 'adding_debtor_address':
+        session.newDebtorAddress = text;
+        session.state = 'adding_debtor_password';
+        await ctx.reply(
+          '🔑 Qarzdor uchun parol kiriting (kamida 4 belgidan):',
+          Markup.keyboard([['❌ Bekor qilish']]).resize(),
+        );
+        break;
+
+      case 'adding_debtor_password':
+        if (text.length < 4) {
+          await ctx.reply('❌ Parol kamida 4 belgidan iborat bo‘lishi kerak.');
+          return;
+        }
+        session.newDebtorPassword = text;
+
+        // ShopOwnerni phone orqali topamiz
+        const shop = await this.prisma.shop.findFirst({
+          where: { users: { some: { phone: session.phone } } },
+        });
+
+        if (!shop) {
+          await ctx.reply('❌ Sizga tegishli shop topilmadi.');
+          session.state = 'shop_owner_menu';
+          session.newDebtorName = undefined;
+          session.newDebtorPhone = undefined;
+          session.newDebtorAddress = undefined;
+          session.newDebtorPassword = undefined;
+          await this.showMenu(ctx, session);
+          return;
+        }
+
+        // Debtor yaratish
+        const newDebtor = await this.prisma.debtor.create({
           data: {
             name: session.newDebtorName!,
             phone: session.newDebtorPhone!,
-            address: session.newDebtorAddress,
+            address: session.newDebtorAddress!,
             password: session.newDebtorPassword!,
-            shop: { connect: { id: user.shopId } },
+            shop: { connect: { id: shop.id } },
           },
         });
 
+        // sessionni tozalash va asosiy menyuga qaytish
         session.state = 'shop_owner_menu';
         session.newDebtorName = undefined;
         session.newDebtorPhone = undefined;
@@ -211,7 +257,7 @@ export class ShopOwnerHandler {
         session.newDebtorPassword = undefined;
 
         await ctx.reply(
-          '✅ Qarzdor muvaffaqiyatli qo‘shildi!',
+          `✅ Yangi qarzdor "${newDebtor.name}" qo‘shildi!`,
           Markup.keyboard([
             ['➕ Qarzdor qo‘shish'],
             ['📋 Qarzdorlar ro‘yxati'],
@@ -220,6 +266,14 @@ export class ShopOwnerHandler {
         );
         break;
     }
+  }
+
+  private async resetDebtorSession(session: SessionData) {
+    session.state = 'shop_owner_menu';
+    session.newDebtorName = undefined;
+    session.newDebtorPhone = undefined;
+    session.newDebtorAddress = undefined;
+    session.newDebtorPassword = undefined;
   }
 
   async showDebtors(ctx: Context, session: SessionData): Promise<void> {
@@ -568,12 +622,11 @@ export class ShopOwnerHandler {
 
     if (session.state === 'adding_debt_note') {
       const note = text === '-' ? '' : text;
-
       await this.prisma.debt.create({
         data: {
           amount: session.tempDebtAmount ?? 0,
           note,
-          debtorId: session.tempDebtorId ?? '',
+          debtorId: session.tempDebtorId!,
         },
       });
 

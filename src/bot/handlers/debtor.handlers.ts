@@ -35,7 +35,7 @@ export class DebtorHandler {
       case '💰 To‘lash':
         await this.showDebtsForPayment(ctx, session);
         break;
-        // SHU YERDAN QOLGANLARINI QO'SHING---------------------------------------------------------------------------------------------------------
+      // SHU YERDAN QOLGANLARINI QO'SHING---------------------------------------------------------------------------------------------------------
       case '📞 Aloqa':
         await ctx.reply('📞 Aloqa uchun: +998 99 123 45 67');
         break;
@@ -110,8 +110,14 @@ export class DebtorHandler {
   }
 
   private async showDebtsForPayment(ctx: Context, session: SessionData) {
+    const debtor = await this.prisma.debtor.findFirst({
+      where: { phone: session.phone },
+    });
+
+    if (!debtor) return ctx.reply('❌ Qarzdor topilmadi.');
+
     const debts = await this.prisma.debt.findMany({
-      where: { debtor: { phone: session.phone }, status: 'UNPAID' },
+      where: { debtorId: debtor.id, status: 'UNPAID' },
       orderBy: { createdAt: 'desc' },
     });
 
@@ -131,7 +137,7 @@ export class DebtorHandler {
     });
   }
 
-  // 🔹 Callback - qarz tanlash
+  // 🔹 Callback - qarzni tanlaganda
   async handleCallbackQuery(ctx: any, session: SessionData) {
     const data = ctx.callbackQuery.data;
 
@@ -159,6 +165,7 @@ export class DebtorHandler {
     const amount = parseFloat(ctx.message.text);
     if (isNaN(amount) || amount <= 0) {
       await ctx.reply('❌ Iltimos, to‘g‘ri summani kiriting.');
+      return;
     }
 
     if (!session.tempDebtId) return;
@@ -166,19 +173,27 @@ export class DebtorHandler {
     const debt = await this.prisma.debt.findUnique({
       where: { id: session.tempDebtId },
     });
+
     if (!debt) {
       await ctx.reply('❌ Qarz topilmadi.');
       return;
     }
 
-    // Har qanday summa kiritilganda payment yozuvini qo‘shamiz
+    // ✅ Endi TypeScriptga debt null emasligini bildirayapmiz
     await this.prisma.payment.create({
       data: {
         debtId: debt.id,
         amount,
-        approved: false, // admin tasdiqlashini kutadi
+        approved: false,
       },
     });
+
+    if (amount >= debt.amount) {
+      await this.prisma.debt.update({
+        where: { id: debt.id },
+        data: { status: 'PAID' },
+      });
+    }
 
     await ctx.reply(
       `⚠️ Siz ${amount} so'm to‘landingiz. Qarzni SHOP_OWNER tasdiqlagandan keyin yopiladi.`,
