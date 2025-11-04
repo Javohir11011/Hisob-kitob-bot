@@ -3,9 +3,49 @@
     {
       "id": "1900713644:1900713644",
       "data": {
-        "state": "shop_owner_menu",
+        "state": "debtor_menu",
         "password": "2",
         "phone": "+998915319081",
+        "role": "SHOP_OWNER",
+        "tempDebtorId": "6512f134-a515-4bfd-87bb-c5ef67387bdf",
+        "tempDebtAmount": 1000000,
+        "debtorPassword": "fdsa",
+        "tempDebtId": "b97c95cb-b9ef-4b98-afe3-9ba8b3c6854c"
+      }
+    },
+    {
+      "id": "6624217456:6624217456",
+      "data": {
+        "state": "super_admin_menu",
+        "debtorPassword": "1232",
+        "role": "SUPER_ADMIN",
+        "debtorId": "01031ef7-b921-4cf3-80a0-bb48560c1f84",
+        "tempDebtorId": "d1cc86ee-b7a4-4660-8517-24cbc404fbeb",
+        "password": "1",
+        "phone": "+998946966636",
+        "newOwnerName": "Javohir",
+        "newOwnerPhone": "+998507278483",
+        "newOwnerPassword": "1234",
+        "newOwnerShop": "Yallama",
+        "newOwnerShopAddress": "Jizzax"
+      }
+    },
+    {
+      "id": "6619118781:6619118781",
+      "data": {
+        "state": "debtor_menu",
+        "debtorPassword": "2",
+        "role": "DEBTOR",
+        "debtorId": "197286f4-63ca-429e-bed9-fcdd3f63b388",
+        "tempDebtorId": "1657cdb3-49d8-4be4-aa96-c16651fb47ca"
+      }
+    },
+    {
+      "id": "1998536310:1998536310",
+      "data": {
+        "state": "debtor_menu",
+        "password": "1234",
+        "phone": "+998507278483",
         "role": "SHOP_OWNER"
       }
     }

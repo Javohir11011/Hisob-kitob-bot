@@ -85,6 +85,13 @@ export class SuperAdminHandler {
       case 'super_admin_menu':
         return this.handleMenu(ctx, session);
 
+      case 'adding_owner_name':
+      case 'adding_owner_phone':
+      case 'adding_owner_password':
+      case 'adding_owner_shop':
+      case 'adding_owner_shop_address':
+        return this.handleAddOwner(ctx, session);
+
       case 'updating_own_info':
         if (text === '❌ Bekor qilish') {
           session.state = 'super_admin_menu';
