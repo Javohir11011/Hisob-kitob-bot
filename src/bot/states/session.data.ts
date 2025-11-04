@@ -53,7 +53,8 @@ export type SessionData = {
     | 'paying_debt_amount'
     | 'updating_debt'
     | 'editing_debt'
-    | 'awaiting_debtor_selection';
+    | 'awaiting_debtor_selection'
+    | 'repaying_amount';
 
   // --- General session data ---
   userId: string;

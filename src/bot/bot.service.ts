@@ -200,5 +200,25 @@ export class BotService implements OnModuleInit {
         console.error('❌ callback_query error:', err);
       }
     });
+
+    this.bot.action(/all_debts_(.+)/, async (ctx) => {
+      const debtorId = ctx.match[1];
+      await this.shopOwnerHandler.showAllDebts(ctx, debtorId);
+      await ctx.answerCbQuery();
+    });
+
+    // Update
+    // this.bot.action(/update_debtor_(.+)/, async (ctx) => {
+    //   const debtorId = ctx.match[1];
+    //   await this.shopOwnerHandler.startEditDebtor(ctx, debtorId, ctx.session);
+    //   await ctx.answerCbQuery();
+    // });
+
+    // Delete
+    this.bot.action(/delete_debtor_(.+)/, async (ctx) => {
+      const debtorId = ctx.match[1];
+      await this.shopOwnerHandler.deleteDebtor(ctx, debtorId);
+      await ctx.answerCbQuery();
+    });
   }
 }

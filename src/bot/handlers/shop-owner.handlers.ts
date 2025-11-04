@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
 import { Context, Markup } from 'telegraf';
 import { PrismaService } from '../../core/prisma.service';
 import { SessionData } from '../states/session.data';
@@ -61,6 +60,8 @@ export class ShopOwnerHandler {
     if (!ctx.message || !('text' in ctx.message)) return;
     const text = ctx.message.text.trim();
 
+    console.log('📩', text, '| State:', session.state);
+
     switch (session.state) {
       /* 🔸 Asosiy menyu */
       case 'shop_owner_menu':
@@ -75,9 +76,8 @@ export class ShopOwnerHandler {
         if (text === '📋 Qarzdorlar') return this.showDebtors(ctx, session);
 
         if (text === '💰 Qarz yopish')
-          // await this.showPayDebtorMenu(ctx, session); // ✅ Yangi funksiya qo‘shamiz
-
-          break;
+          await this.showPayDebtorMenu(ctx, session);
+        return;
 
       /* 🔸 Profil menyu */
       case 'shop_owner_profile':
@@ -94,13 +94,16 @@ export class ShopOwnerHandler {
       /* 🔸 Qarz qo‘shish */
       case 'adding_debt_amount':
       case 'adding_debt_note':
-        return this.handleAddDebtAmountAndNote(ctx, session);
+        await this.handleAddDebtAmountAndNote(ctx, session);
+        return;
+      case 'search_debtor_for_debt':
+        return this.handleSearchAndSelectDebtor(ctx, session);
 
       /* 🔸 Helper qo‘shish */
-      case 'adding_helper_name':
-      case 'adding_helper_phone':
-      case 'adding_helper_password':
-        return this.handleAddHelper(ctx, session);
+      // case 'adding_helper_name':
+      // case 'adding_helper_phone':
+      // case 'adding_helper_password':
+      // return this.handleAddHelper(ctx, session);
 
       /* 🔸 Qarzdorlar menyusi (Qidirish / Orqaga) */
       case 'debtor_menu':
@@ -128,50 +131,7 @@ export class ShopOwnerHandler {
 
       /* 🔸 Qarzni yopish (miqdor kiritilgandan keyin) */
       case 'paying_debt':
-        const debtorId = session.tempDebtorId;
-        if (!debtorId) {
-          await ctx.reply('❌ Qarzdor aniqlanmadi.');
-          session.state = 'debtor_menu';
-          return;
-        }
-
-        let amount = parseInt(text.replace(/\s+/g, ''), 10);
-        if (isNaN(amount) || amount <= 0) {
-          await ctx.reply('❌ Iltimos, to‘lash uchun to‘g‘ri summa kiriting.');
-          return;
-        }
-
-        const debtor = await this.prisma.debtor.findUnique({
-          where: { id: debtorId },
-          include: { debts: true },
-        });
-
-        if (!debtor) {
-          await ctx.reply('❌ Qarzdor topilmadi.');
-          session.state = 'debtor_menu';
-          return;
-        }
-
-        const totalDebt = debtor.debts.reduce((sum, d) => sum + d.amount, 0);
-        if (amount > totalDebt) amount = totalDebt;
-
-        let remaining = amount;
-        for (const debt of debtor.debts) {
-          if (remaining <= 0) break;
-          const pay = Math.min(debt.amount, remaining);
-          await this.prisma.debt.update({
-            where: { id: debt.id },
-            data: { amount: debt.amount - pay },
-          });
-          remaining -= pay;
-        }
-
-        await ctx.reply(
-          `✅ ${debtor.name} qarzidan ${amount.toLocaleString()} so‘m yopildi.`,
-        );
-        session.state = 'debtor_menu';
-        await this.showDebtors(ctx, session);
-        return;
+        return this.handleDebtPayment(ctx, session);
 
       default:
         session.state = 'shop_owner_menu';
@@ -180,66 +140,7 @@ export class ShopOwnerHandler {
   }
 
   /* -----------------------
-     HELPER QO‘SHISH
-  ----------------------- */
-  async startAddHelper(ctx: Context, session: SessionData): Promise<void> {
-    session.state = 'adding_helper_name';
-    await ctx.reply(
-      'Yangi Helper ismini kiriting:',
-      Markup.keyboard([['❌ Bekor qilish']]).resize(),
-    );
-  }
-
-  async handleAddHelper(ctx: Context, session: SessionData): Promise<void> {
-    if (!ctx.message || !('text' in ctx.message)) return;
-    const text = ctx.message.text.trim();
-    if (text === '❌ Bekor qilish') return this.showMenu(ctx, session);
-
-    switch (session.state) {
-      case 'adding_helper_name':
-        session.newHelperName = text;
-        session.state = 'adding_helper_phone';
-        await ctx.reply('Helper telefon raqamini kiriting (+998XXXXXXXXX):');
-        return;
-
-      case 'adding_helper_phone':
-        let phone = text;
-        if (phone.startsWith('0')) phone = '+998' + phone.slice(1);
-        if (!phone.startsWith('+')) phone = '+' + phone;
-        if (!/^\+998\d{9}$/.test(phone)) {
-          await ctx.reply('❌ Telefon noto‘g‘ri formatda.');
-          return;
-        }
-        session.newHelperPhone = phone;
-        session.state = 'adding_helper_password';
-        await ctx.reply('Helper uchun parol kiriting:');
-        return;
-
-      case 'adding_helper_password':
-        session.newHelperPassword = text;
-        const shopOwner = await this.prisma.user.findFirst({
-          where: { phone: session.phone },
-        });
-        if (!shopOwner?.shopId) {
-          await ctx.reply('❌ Sizning shopingiz topilmadi.');
-          return;
-        }
-        await this.prisma.user.create({
-          data: {
-            name: session.newHelperName ?? '',
-            phone: session.newHelperPhone ?? '',
-            password: await bcrypt.hash(session.newHelperPassword ?? '', 10),
-            role: 'SHOP_HELPER',
-            shopId: shopOwner.shopId,
-          },
-        });
-        await ctx.reply(`✅ Helper "${session.newHelperName}" qo‘shildi`);
-        return this.showMenu(ctx, session);
-    }
-  }
-
-  /* -----------------------
-   QARZDOR CRUD
+   QARZDOR CRUD + SEARCH
 ----------------------- */
   async startAddDebtor(ctx: Context, session: SessionData): Promise<void> {
     session.state = 'adding_debtor_name';
@@ -267,50 +168,32 @@ export class ShopOwnerHandler {
       case 'adding_debtor_name':
         session.newDebtorName = text;
         session.state = 'adding_debtor_phone';
-        console.log('📝 State changed to adding_debtor_phone');
         await ctx.reply(
           '📞 Qarzdor telefon raqamini kiriting (+998XXXXXXXXX yoki +7XXXXXXXXXX):',
         );
         break;
-
       case 'adding_debtor_phone':
         session.newDebtorPhone = text;
         session.state = 'adding_debtor_address';
-        console.log('📝 State changed to adding_debtor_address');
         await ctx.reply('🏠 Qarzdor manzilini kiriting:');
         break;
-
       case 'adding_debtor_address':
         session.newDebtorAddress = text;
         session.state = 'adding_debtor_password';
-        console.log('📝 State changed to adding_debtor_password');
         await ctx.reply('🔑 Qarzdor uchun parol kiriting (kamida 4 belgidan):');
         break;
-
       case 'adding_debtor_password':
         session.newDebtorPassword = text;
 
-        console.log('➡️ Collected info:', {
-          name: session.newDebtorName,
-          phone: session.newDebtorPhone,
-          address: session.newDebtorAddress,
-          password: session.newDebtorPassword,
-        });
-
-        // Shop ownerni topamiz
         const user = await this.prisma.user.findFirst({
           where: { phone: session.phone },
         });
-
         if (!user?.shopId) {
-          await ctx.reply(
-            '❌ Do‘kon topilmadi! Iltimos, telefon raqamingizni tekshiring.',
-          );
+          await ctx.reply('❌ Do‘kon topilmadi!');
           session.state = 'shop_owner_menu';
           return;
         }
 
-        // Debtor yaratish
         await this.prisma.debtor.create({
           data: {
             name: session.newDebtorName!,
@@ -321,9 +204,6 @@ export class ShopOwnerHandler {
           },
         });
 
-        console.log('✅ Debtor created:', session.newDebtorName);
-
-        // Sessionni tozalaymiz
         session.state = 'shop_owner_menu';
         session.newDebtorName = undefined;
         session.newDebtorPhone = undefined;
@@ -335,21 +215,13 @@ export class ShopOwnerHandler {
           Markup.keyboard([
             ['➕ Qarzdor qo‘shish'],
             ['📋 Qarzdorlar ro‘yxati'],
-            ['🔙 Orqaga'],
+            ['↩️ Orqaga'],
           ]).resize(),
         );
-        break;
-
-      default:
-        console.log('❌ Unknown state:', session.state);
-        await ctx.reply('❌ Iltimos, menyudan tanlang.');
         break;
     }
   }
 
-  /* -----------------------
-   QARZDOR CRUD + SEARCH
------------------------ */
   async showDebtors(ctx: Context, session: SessionData): Promise<void> {
     try {
       const shopOwner = await this.prisma.user.findFirst({
@@ -366,7 +238,7 @@ export class ShopOwnerHandler {
         include: { debts: true },
       });
 
-      // 🔹 STATE avval yoziladi — bu juda muhim
+      // 🔹 STATE avval yoziladi
       session.state = 'debtor_menu';
 
       if (debtors.length === 0) {
@@ -378,30 +250,36 @@ export class ShopOwnerHandler {
       }
 
       let list = '📋 <b>Qarzdorlar ro‘yxati:</b>\n\n';
+      let totalShopDebt = 0;
+
       debtors.forEach((d, i) => {
         const totalDebt = d.debts.reduce((sum, debt) => sum + debt.amount, 0);
+        totalShopDebt += totalDebt;
+
         const createdAt = new Date(d.createdAt).toLocaleDateString('uz-UZ', {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
         });
+
         list += `<b>${i + 1}. ${d.name}</b>\n📞 ${d.phone}\n💰 ${totalDebt.toLocaleString()} so‘m\n📅 ${createdAt}\n\n`;
       });
+
+      // 🔹 Oxirida do‘kon bo‘yicha umumiy qarz
+      list += `💰 <b>Do‘kon bo‘yicha umumiy qarz:</b> ${totalShopDebt.toLocaleString()} so‘m`;
 
       await ctx.replyWithHTML(
         list,
         Markup.keyboard([['🔍 Qidirish'], ['↩️ Orqaga']]).resize(),
       );
     } catch (error) {
-      console.error('❌ showDebtors error:', error);
+      console.error(error);
       await ctx.reply('⚠️ Qarzdorlarni yuklashda xatolik yuz berdi.');
     }
   }
 
-  /* 🔍 Qidirishni boshlash */
-  async startSearchDebtor(ctx: Context, session: SessionData): Promise<void> {
+  async startSearchDebtor(ctx: Context, session: SessionData) {
     session.state = 'searching_debtor';
-
     await ctx.reply(
       '🔍 Qidirilayotgan qarzdor ismi yoki telefon raqamini kiriting:',
       Markup.keyboard([['↩️ Orqaga']]).resize(),
@@ -417,7 +295,6 @@ export class ShopOwnerHandler {
     const shopOwner = await this.prisma.user.findFirst({
       where: { phone: session.phone },
     });
-
     if (!shopOwner?.shopId) {
       await ctx.reply('❌ Sizning shopingiz topilmadi.');
       return;
@@ -472,19 +349,15 @@ export class ShopOwnerHandler {
         debtor.address ?? 'Manzil yo‘q'
       }`,
       Markup.inlineKeyboard([
-        // [Markup.button.callback('✏️ Tahrirlash', `editdeb_${debtor.id}`)],
+        [Markup.button.callback('✏️ Tahrirlash', `editdeb_${debtor.id}`)],
         [Markup.button.callback('🗑 O‘chirish', `deldeb_${debtor.id}`)],
         [Markup.button.callback('↩️ Orqaga', 'back_to_debtors')],
       ]),
     );
   }
 
-  /* ✏️ Tahrirlashni boshlash */
-  async startEditDebtor(
-    ctx: Context,
-    debtorId: string,
-    session: SessionData,
-  ): Promise<void> {
+  // /* ✏️ Tahrirlashni boshlash */
+  async startEditDebtor(ctx: Context, debtorId: string, session: SessionData) {
     const debtor = await this.prisma.debtor.findUnique({
       where: { id: debtorId },
       include: { debts: true },
@@ -514,7 +387,7 @@ export class ShopOwnerHandler {
           ),
         ],
         [Markup.button.callback('💰 Qarz qo‘shish', `addDebt:${debtorId}`)],
-        // [Markup.button.callback('↩️ Orqaga', 'back_to_search')],
+        [Markup.button.callback('🗑 Delete', `delete_debtor_${debtorId}`)],
       ]),
     );
   }
@@ -582,17 +455,23 @@ export class ShopOwnerHandler {
 
       await ctx.reply(
         '🗑 Qarzdor va uning barcha qarz yozuvlari o‘chirildi.✅',
+        Markup.keyboard([['📋 Qarzdorlar'], ['↩️ Orqaga']]).resize(),
       );
+
+      const session = ctx.session as SessionData;
+      if (session.role === 'SHOP_OWNER') {
+        await this.showDebtors(ctx, session);
+      }
     } catch (err) {
       console.error('❌ deleteDebtor error:', err);
       await ctx.reply('⚠️ Qarzdorni o‘chirishda xatolik yuz berdi.');
     }
   }
-
   /* -----------------------
-     QARZ QO‘SHISH (inline tugmalar bilan)
-  ----------------------- */
-  async startAddDebtSearch(ctx: Context, session: SessionData): Promise<void> {
+   QARZ QO‘SHISH (bosqichma-bosqich)
+----------------------- */
+  // 1️⃣ Qarz qo‘shish boshi: qarzdor qidirish
+  async startAddDebtSearch(ctx: Context, session: SessionData) {
     session.state = 'search_debtor_for_debt';
     await ctx.reply(
       '🔎 Qarzdorning ismi yoki telefon raqamini kiriting:',
@@ -600,158 +479,17 @@ export class ShopOwnerHandler {
     );
   }
 
-  // async handleCallbackQuery(ctx: any, session: SessionData) {
-  //   const callbackQuery = ctx.callbackQuery;
-  //   if (!callbackQuery || !('data' in callbackQuery)) return;
-  //   const data = callbackQuery.data;
-
-  //   if (!data) return;
-
-  //   // 🔹 Qarzdorga qarz qo‘shish
-  //   if (data.startsWith('addDebt:')) {
-  //     const debtorId = data.split(':')[1];
-  //     session.tempDebtorId = debtorId;
-  //     session.state = 'adding_debt_amount';
-  //     await ctx.answerCbQuery('💰 Qarz summasini kiriting');
-  //     await ctx.reply('💰 Qarz summasini kiriting:');
-  //     return;
-  //   }
-
-  //   // 🔹 Qarzdorni qarzini YOPISH
-  //   if (data.startsWith('payDebt:')) {
-  //     const debtorId = data.split(':')[1];
-  //     session.tempDebtorId = debtorId;
-
-  //     const debtor = await this.prisma.debtor.findUnique({
-  //       where: { id: debtorId },
-  //       include: { debts: true },
-  //     });
-
-  //     if (!debtor) {
-  //       await ctx.reply('❌ Qarzdor topilmadi.');
-  //       return;
-  //     }
-
-  //     if (debtor.debts.length === 0) {
-  //       await ctx.reply('💰 Bu qarzdorning qarzi yo‘q.');
-  //       return;
-  //     }
-
-  //     // Har bir qarz yozuvi tugmalar bilan
-  //     const inlineButtons = debtor.debts.map((d) => [
-  //       {
-  //         text: `${d.amount.toLocaleString()} so‘m (${d.createdAt.toLocaleDateString('uz-UZ')})`,
-  //         callback_data: `paySingleDebt:${d.id}`,
-  //       },
-  //     ]);
-
-  //     session.state = 'awaiting_single_debt_payment';
-
-  //     await ctx.reply(`💰 ${debtor.name} qarzlarini tanlang:`, {
-  //       reply_markup: { inline_keyboard: inlineButtons },
-  //     });
-  //     await ctx.answerCbQuery();
-  //   }
-
-  //   // 🔹 Barcha qarzlarni ko‘rsatish
-  //   if (data.startsWith('all_debts_')) {
-  //     const debtorId = data.split('_')[2];
-  //     await this.showAllDebts(ctx, debtorId);
-  //     await ctx.answerCbQuery();
-  //     return;
-  //   }
-
-  //   // 🔹 Ismni tahrirlash
-  //   if (data.startsWith('edit_name_')) {
-  //     const debtorId = data.split('_')[2];
-  //     const debtor = await this.prisma.debtor.findUnique({
-  //       where: { id: debtorId },
-  //     });
-  //     if (!debtor) {
-  //       await ctx.reply('❌ Qarzdor topilmadi.');
-  //       return;
-  //     }
-  //     session.tempDebtorId = debtorId;
-  //     session.state = 'editing_debtor_name';
-  //     await ctx.answerCbQuery();
-  //     await ctx.reply(`📝 Yangi ismni kiriting (hozirgi: ${debtor.name}):`);
-  //     return;
-  //   }
-
-  //   // 🔹 Telefon raqamini tahrirlash
-  //   if (data.startsWith('edit_phone_')) {
-  //     const debtorId = data.split('_')[2];
-  //     const debtor = await this.prisma.debtor.findUnique({
-  //       where: { id: debtorId },
-  //     });
-  //     if (!debtor) {
-  //       await ctx.reply('❌ Qarzdor topilmadi.');
-  //       return;
-  //     }
-  //     session.tempDebtorId = debtorId;
-  //     session.state = 'editing_debtor_phone';
-  //     await ctx.answerCbQuery();
-  //     await ctx.reply(
-  //       `📞 Yangi telefon raqamni kiriting (hozirgi: ${debtor.phone}):`,
-  //     );
-  //     return;
-  //   }
-
-  //   // 🔹 Qarzdorni o‘chirish
-  //   if (data.startsWith('delete_debtor_')) {
-  //     const debtorId = data.split('_')[2];
-  //     await this.deleteDebtor(ctx, debtorId);
-  //     await ctx.answerCbQuery();
-  //     return;
-  //   }
-
-  //   // 🔹 Orqaga qaytish
-  //   if (data === 'back_to_search') {
-  //     session.state = 'debtor_menu';
-  //     await this.showDebtors(ctx, session);
-  //     await ctx.answerCbQuery();
-  //     return;
-  //   }
-  //   // 🔹 Qarz yopish
-  //   if (data.startsWith('payDebt:')) {
-  //     const debtorId = data.split(':')[1];
-  //     session.tempDebtorId = debtorId;
-
-  //     // Debtorni topish
-  //     const debtor = await this.prisma.debtor.findUnique({
-  //       where: { id: debtorId },
-  //       include: { debts: true },
-  //     });
-
-  //     if (!debtor) {
-  //       await ctx.reply('❌ Qarzdor topilmadi.');
-  //       return;
-  //     }
-
-  //     const totalDebt = debtor.debts.reduce((sum, d) => sum + d.amount, 0);
-  //     if (totalDebt === 0) {
-  //       await ctx.reply('💰 Bu qarzdorning qarzi yo‘q.');
-  //       return;
-  //     }
-
-  //     session.state = 'paying_debt';
-  //     await ctx.answerCbQuery();
-  //     await ctx.reply(
-  //       `💰 ${debtor.name} jami qarzi: ${totalDebt.toLocaleString()} so‘m\n` +
-  //         '📌 Qancha to‘laysiz? (summani son bilan kiriting):',
-  //     );
-  //     return;
-  //   }
-  // }
-
   async handleSearchAndSelectDebtor(ctx: Context, session: SessionData) {
     if (!ctx.message || !('text' in ctx.message)) return;
+    if (session.state !== 'search_debtor_for_debt') return;
+    const query = ctx.message.text.trim();
+    if (!query) return;
+
     const text = ctx.message.text.trim();
 
     if (text === '❌ Bekor qilish') {
       session.state = 'shop_owner_menu';
-      await this.showMenu(ctx, session);
-      return;
+      return this.showMenu(ctx, session);
     }
 
     const shopOwner = await this.prisma.user.findFirst({
@@ -760,39 +498,47 @@ export class ShopOwnerHandler {
     if (!shopOwner?.shopId) {
       await ctx.reply('❌ Sizning shopingiz topilmadi.');
       session.state = 'shop_owner_menu';
-      await this.showMenu(ctx, session);
-      return;
+      return this.showMenu(ctx, session);
     }
 
     const debtors = await this.prisma.debtor.findMany({
       where: {
         shopId: shopOwner.shopId,
         OR: [
-          { name: { contains: text, mode: 'insensitive' } },
-          { phone: { contains: text } },
+          { name: { contains: query, mode: 'insensitive' } },
+          { phone: { contains: query } },
         ],
       },
     });
 
-    if (debtors.length === 0) {
+    if (!debtors.length) {
       await ctx.reply('❌ Qarzdor topilmadi. Avval qarzdor qo‘shing.');
       session.state = 'shop_owner_menu';
-      await this.showMenu(ctx, session);
-      return;
+      return this.showMenu(ctx, session);
     }
 
-    // Inline tugmalar bilan
     const inlineButtons = debtors.map((d) => [
       {
         text: `${d.name} (${d.phone ?? 'yo‘q'})`,
         callback_data: `addDebt:${d.id}`,
       },
     ]);
+
     await ctx.reply('👥 Qarzdor topildi, tanlang:', {
       reply_markup: { inline_keyboard: inlineButtons },
     });
 
     session.state = 'awaiting_debtor_selection';
+  }
+
+  async handleDebtorSelection(
+    ctx: Context,
+    session: SessionData,
+    debtorId: string,
+  ) {
+    session.tempDebtorId = debtorId;
+    session.state = 'adding_debt_amount';
+    await ctx.reply('💰 Qarz summasini kiriting');
   }
 
   async handleAddDebtAmountAndNote(
@@ -809,9 +555,9 @@ export class ShopOwnerHandler {
     }
 
     if (session.state === 'adding_debt_amount') {
-      const amount = parseInt(text, 10);
-      if (isNaN(amount) || amount <= 1000) {
-        await ctx.reply('1000 somdan kamm summa kiritib bo‘lmaydi.');
+      const amount = parseInt(text.replace(/\s+/g, ''), 10);
+      if (isNaN(amount) || amount <= 0) {
+        await ctx.reply('❌ Iltimos, to‘g‘ri summa kiriting.');
         return;
       }
       session.tempDebtAmount = amount;
@@ -822,6 +568,7 @@ export class ShopOwnerHandler {
 
     if (session.state === 'adding_debt_note') {
       const note = text === '-' ? '' : text;
+
       await this.prisma.debt.create({
         data: {
           amount: session.tempDebtAmount ?? 0,
@@ -831,84 +578,37 @@ export class ShopOwnerHandler {
       });
 
       await ctx.reply(
-        `✅ Qarzdorga ${session.tempDebtAmount} so‘m qo‘shildi.\n📌 ${note || '(izoh yo‘q)'}`,
+        `✅ Qarzdorga ${session.tempDebtAmount?.toLocaleString()} so‘m qo‘shildi.\n📌 ${note || '(izoh yo‘q)'}`,
       );
 
       session.state = 'shop_owner_menu';
       await this.showMenu(ctx, session);
+      return;
     }
   }
 
   /* -----------------------
-     QARZ YOPISH (bosqichma-bosqich)
-  ----------------------- */
+   QARZ YOPISH (bosqichma-bosqich)
+----------------------- */
   async handleCallbackQuery(ctx: any, session: SessionData) {
     const callbackQuery = ctx.callbackQuery;
     if (!callbackQuery || !('data' in callbackQuery)) return;
     const data = callbackQuery.data;
+    console.log('🟢 Callback:', data, '| State:', session.state);
+
     if (!data) return;
 
-    /* ---------------------
-     QARZLAR BO‘YICHA CALLBACKLAR
-  --------------------- */
-
-    // 🔹 Qarzdorga qarz qo‘shish
     if (data.startsWith('addDebt:')) {
       const debtorId = data.split(':')[1];
       session.tempDebtorId = debtorId;
       session.state = 'adding_debt_amount';
+
       await ctx.answerCbQuery('💰 Qarz summasini kiriting');
       await ctx.reply('💰 Qarz summasini kiriting:');
       return;
     }
 
-    // 🔹 Qarzdorni o‘chirish
-    if (data.startsWith('delete_debtor_')) {
-      const debtorId = data.split('_')[2];
-      await this.deleteDebtor(ctx, debtorId);
-      await ctx.answerCbQuery();
-      return;
-    }
-
-    // 🔹 Ismni tahrirlash
-    if (data.startsWith('edit_name_')) {
-      const debtorId = data.split('_')[2];
-      const debtor = await this.prisma.debtor.findUnique({
-        where: { id: debtorId },
-      });
-      if (!debtor) return ctx.reply('❌ Qarzdor topilmadi.');
-      session.tempDebtorId = debtorId;
-      session.state = 'editing_debtor_name';
-      await ctx.answerCbQuery();
-      await ctx.reply(`📝 Yangi ismni kiriting (hozirgi: ${debtor.name}):`);
-      return;
-    }
-
-    // 🔹 Telefonni tahrirlash
-    if (data.startsWith('edit_phone_')) {
-      const debtorId = data.split('_')[2];
-      const debtor = await this.prisma.debtor.findUnique({
-        where: { id: debtorId },
-      });
-      if (!debtor) return ctx.reply('❌ Qarzdor topilmadi.');
-      session.tempDebtorId = debtorId;
-      session.state = 'editing_debtor_phone';
-      await ctx.answerCbQuery();
-      await ctx.reply(
-        `📞 Yangi telefon raqamni kiriting (hozirgi: ${debtor.phone}):`,
-      );
-      return;
-    }
-
-    // 🔹 Barcha qarzlarni ko‘rish
-    if (data.startsWith('all_debts_')) {
-      const debtorId = data.split('_')[2];
-      await this.showAllDebts(ctx, debtorId);
-      await ctx.answerCbQuery();
-      return;
-    }
-
-    // 🔹 Qarzdor qarzini yopish menyusi
+    // 🔹 Qarzdor qarzini yopish (hammasi yoki bitta)
     if (data.startsWith('payDebt:')) {
       const debtorId = data.split(':')[1];
       session.tempDebtorId = debtorId;
@@ -956,11 +656,23 @@ export class ShopOwnerHandler {
 
       if (!debt) return ctx.reply('❌ Qarz topilmadi.');
 
-      await this.prisma.debt.delete({ where: { id: debtId } });
-      await ctx.reply(
-        `✅ ${debt.debtor.name}ning ${debt.amount.toLocaleString()} so‘mlik qarzi yopildi.`,
-      );
+      // 🔹 Session ma'lumotlarini saqlaymiz
+      session.tempDebtId = debtId;
+      session.tempDebtorId = debt.debtor.id;
+      session.state = 'paying_debt';
+
       await ctx.answerCbQuery();
+      await ctx.reply(
+        `💰 ${debt.debtor.name}ning ${debt.amount.toLocaleString()} so‘mlik qarzidan qancha to‘laysiz?`,
+      );
+
+      // 🔸 Debug uchun log qo‘shamiz
+      console.log(
+        '➡️ [DEBUG] session.state:',
+        session.state,
+        ' debtId:',
+        session.tempDebtId,
+      );
       return;
     }
 
@@ -983,43 +695,128 @@ export class ShopOwnerHandler {
       return;
     }
 
-    // 🔹 Orqaga qaytish
-    if (data === 'back_to_search') {
-      session.state = 'debtor_menu';
-      await this.showDebtors(ctx, session);
-      await ctx.answerCbQuery();
+    if (data.startsWith('paySingleDebt:')) {
+      const debtId = data.split(':')[1];
+      const debt = await this.prisma.debt.findUnique({
+        where: { id: debtId },
+        include: { debtor: true },
+      });
+
+      if (!debt) {
+        await ctx.reply('❌ Qarz topilmadi.');
+        return;
+      }
+
+      session.tempDebtId = debt.id;
+      session.tempDebtorId = debt.debtor.id;
+      session.state = 'paying_debt'; // 👈 Bu muhim!
+      await ctx.reply(
+        `💰 ${debt.debtor.name}ning ${debt.amount.toLocaleString()} so‘mlik qarzidan qancha to‘laysiz?`,
+      );
       return;
     }
   }
 
-  // async showPayDebtorMenu(ctx: Context, session: SessionData) {
-  //   const debtors = await this.prisma.debtor.findMany({
-  //     where: { ownerId: session.userId },
-  //     include: { debts: true },
-  //   });
+  async showPayDebtorMenu(ctx: Context, session: SessionData): Promise<void> {
+    const shopOwner = await this.prisma.user.findFirst({
+      where: { phone: session.phone },
+    });
 
-  //   if (debtors.length === 0) {
-  //     return ctx.reply('🕳 Qarzdorlar topilmadi.');
-  //   }
+    if (!shopOwner?.shopId) {
+      await ctx.reply('❌ Sizning shopingiz topilmadi.');
+      session.state = 'shop_owner_menu';
+      return this.showMenu(ctx, session);
+    }
 
-  //   let list = '💰 Qarzini yopmoqchi bo‘lgan qarzdorni tanlang:\n\n';
-  //   const buttons = [];
+    const debtors = await this.prisma.debtor.findMany({
+      where: { shopId: shopOwner.shopId },
+      include: { debts: true },
+    });
 
-  //   for (const debtor of debtors) {
-  //     const totalDebt = debtor.debts.reduce((sum, d) => sum + d.amount, 0);
-  //     if (totalDebt > 0) {
-  //       list += `👤 ${debtor.name}\n📞 ${debtor.phone}\n💰 ${totalDebt.toLocaleString()} so‘m\n\n`;
-  //       buttons.push([
-  //         { text: debtor.name, callback_data: `payDebt:${debtor.id}` },
-  //       ]);
-  //     }
-  //   }
+    if (debtors.length === 0) {
+      await ctx.reply('💰 Hozircha qarzdorlar yo‘q.');
+      session.state = 'debtor_menu';
+      return;
+    }
 
-  //   if (buttons.length === 0) return ctx.reply('✅ Hamma qarzlar yopilgan.');
+    const inlineButtons = debtors.map((d) => [
+      {
+        text: `${d.name} (${d.debts.reduce((s, debt) => s + debt.amount, 0).toLocaleString()} so‘m)`,
+        callback_data: `payDebt:${d.id}`,
+      },
+    ]);
 
-  //   buttons.push([{ text: '↩️ Orqaga', callback_data: 'back_to_search' }]);
+    session.state = 'awaiting_debtor_selection';
 
-  //   session.state = 'debtor_menu';
-  //   await ctx.reply(list, { reply_markup: { inline_keyboard: buttons } });
-  // }
+    await ctx.reply('👥 Qarzdorni tanlang:', {
+      reply_markup: { inline_keyboard: inlineButtons },
+    });
+  }
+
+  async handleDebtPayment(ctx: Context, session: SessionData) {
+    if (!ctx.message || !('text' in ctx.message)) return;
+    const text = ctx.message.text.trim();
+    const debtorId = session.tempDebtorId;
+    if (!debtorId) return;
+
+    if (text.toUpperCase() === 'DELETE') {
+      await this.prisma.debt.deleteMany({ where: { debtorId } });
+      await this.prisma.debtor.delete({ where: { id: debtorId } });
+      await ctx.reply('🗑 Qarzdor va barcha qarzlari o‘chirildi.');
+      session.state = 'shop_owner_menu';
+      return this.showMenu(ctx, session);
+    }
+
+    const amount = parseInt(text.replace(/\s+/g, ''), 10);
+    if (isNaN(amount) || amount <= 0) {
+      await ctx.reply('❌ Iltimos, to‘g‘ri summa kiriting.');
+      return;
+    }
+
+    const debts = await this.prisma.debt.findMany({
+      where: { debtorId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    if (debts.length === 0) {
+      await ctx.reply('❌ Bu qarzdorning qarzi yo‘q.');
+      session.state = 'shop_owner_menu';
+      return this.showMenu(ctx, session);
+    }
+
+    let remaining = amount;
+    for (const debt of debts) {
+      if (remaining <= 0) break;
+
+      const pay = Math.min(remaining, debt.amount);
+      const newAmount = debt.amount - pay;
+
+      if (newAmount > 0) {
+        await this.prisma.debt.update({
+          where: { id: debt.id },
+          data: { amount: newAmount },
+        });
+      } else {
+        await this.prisma.debt.delete({ where: { id: debt.id } });
+      }
+
+      remaining -= pay;
+    }
+
+    const debtor = await this.prisma.debtor.findUnique({
+      where: { id: debtorId },
+      include: { debts: true },
+    });
+    const totalLeft = debtor?.debts.reduce((sum, d) => sum + d.amount, 0) ?? 0;
+
+    await ctx.reply(
+      `✅ ${amount - remaining} so‘m to‘landi.\nQolgan qarz: ${totalLeft.toLocaleString()} so‘m`,
+    );
+
+    session.state = 'shop_owner_menu';
+    return this.showMenu(ctx, session);
+  }
+
+  /* -----------------------OXIRIDA FAQAT SINGLE PAYMENT QOLDI
+----------------------- */
 }
