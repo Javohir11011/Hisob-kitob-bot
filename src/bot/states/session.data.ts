@@ -96,6 +96,7 @@ export type SessionData = {
   newDebtorAddress?: string;
   newDebtorPassword?: string;
 
+  
   // --- Debt qo‘shish ---
   tempDebtName?: string; // Qarzdor nomi
   tempDebtAmount?: number;
