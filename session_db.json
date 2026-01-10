@@ -7,23 +7,27 @@
         "password": "2",
         "phone": "+998915319081",
         "role": "SHOP_OWNER",
-        "tempDebtorId": "2cdcd549-54cf-48eb-89f1-267f7b484308",
-        "tempDebtAmount": 5000,
+        "tempDebtorId": "bbe9ac92-dfef-4f7a-bc85-4b6bd949a5c9",
+        "tempDebtAmount": 200000,
         "debtorPassword": "fdsa",
-        "tempDebtId": "b97c95cb-b9ef-4b98-afe3-9ba8b3c6854c"
+        "tempDebtId": "393b0264-4743-476f-8eba-ee0a3e082622"
       }
     },
     {
       "id": "6624217456:6624217456",
       "data": {
-        "state": "adding_owner_phone",
+        "state": "super_admin_menu",
         "debtorPassword": "3",
         "role": "SUPER_ADMIN",
         "debtorId": "2cdcd549-54cf-48eb-89f1-267f7b484308",
         "tempDebtorId": "290c6a8b-971f-40d3-a82b-587e9630bc6a",
         "password": "1",
         "phone": "+998946966636",
-        "newOwnerName": "Javohir"
+        "newOwnerName": "Abdurahmon",
+        "newOwnerPhone": "+998908082022",
+        "newOwnerPassword": "1234",
+        "newOwnerShop": "TOSHIBA",
+        "newOwnerShopAddress": "ABU SAXY"
       }
     },
     {
